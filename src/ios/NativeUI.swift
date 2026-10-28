@@ -65,6 +65,7 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
   private var quickBuild: QuickBuildOverlay?
   private var editor: EditorOverlay?
   private var toolbar: GameToolbar?
+  private var overlay: UIViewController?  // See overlayController().
   private weak var textAlert: UIAlertController?
   private var screenCString: UnsafeMutablePointer<CChar>?
 
@@ -185,21 +186,22 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
           controller.safeAreaRegions = []
         }
         model.inPanel = true
-        root.addChild(controller)
+        guard let overlay = overlayController() else { return }
+        overlay.addChild(controller)
         let view = controller.view!
         view.translatesAutoresizingMaskIntoConstraints = false
         view.layer.cornerRadius = 24
         view.layer.cornerCurve = .continuous
         view.clipsToBounds = true
-        root.view.addSubview(view)
-        let guide = root.view.safeAreaLayoutGuide
+        overlay.view.addSubview(view)
+        let guide = overlay.view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
           view.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -8),
           view.topAnchor.constraint(equalTo: guide.topAnchor, constant: 58),
           view.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
           view.widthAnchor.constraint(equalToConstant: 360),
         ])
-        controller.didMove(toParent: root)
+        controller.didMove(toParent: overlay)
         panel = controller
 
         return
@@ -241,7 +243,7 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
       quickBuild = nil
       return
     }
-    if quickBuild == nil, let view = rootViewController()?.view {
+    if quickBuild == nil, let view = overlayController()?.view {
       quickBuild = QuickBuildOverlay(in: view)
     }
     quickBuild?.update(state)
@@ -259,8 +261,8 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     }
     do {
       let state = try JSONDecoder().decode(EditorState.self, from: Data(json.utf8))
-      if editor == nil, let root = rootViewController() {
-        editor = EditorOverlay(in: root)
+      if editor == nil, let overlay = overlayController() {
+        editor = EditorOverlay(in: overlay)
       }
       editor?.update(state)
     } catch {
@@ -290,7 +292,7 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
       print("Native UI: can't read the toolbar state: \(json)")
       return
     }
-    if toolbar == nil, let view = rootViewController()?.view {
+    if toolbar == nil, let view = overlayController()?.view {
       toolbar = GameToolbar(in: view)
     }
     toolbar?.setHidden(false)
@@ -409,6 +411,27 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
   }
 
   // MARK: View controllers
+
+  //! Where native overlays (toolbar, panels, editor bars) go: a pass-through
+  //! view just above the game's view in the window, not inside it. SDL makes
+  //! its Metal view the root view controller's view, and views inside a
+  //! CAMetalLayer view aren't reliably composited on devices: parts of an
+  //! opaque panel showed the game through until a screenshot redrew them.
+  //! Its own controller is the parent of the panels and trays in it (UIKit
+  //! wants a child's view inside its parent's view).
+  private func overlayController() -> UIViewController? {
+    guard let gameView = rootViewController()?.view, let window = gameView.superview else {
+      return nil
+    }
+    if let overlay = overlay, overlay.view.superview === window { return overlay }
+    let overlay = UIViewController()
+    overlay.view = PassthroughView(frame: window.bounds)
+    overlay.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    // Below anything presented (sheets, the main menu), above the game.
+    window.insertSubview(overlay.view, aboveSubview: gameView)
+    self.overlay = overlay
+    return overlay
+  }
 
   private func rootViewController() -> UIViewController? {
     let windows = UIApplication.shared.connectedScenes
