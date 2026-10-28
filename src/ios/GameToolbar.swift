@@ -1,7 +1,7 @@
 // Copyright (c) 2026 CorsixTH iOS port contributors. MIT licence (see
 // src/native_bridge.h for the full text).
 //
-// The in-game chrome: a status pill (money, date, messages) at the top left
+// The in-game chrome: a status pill (money, date, fax messages) at the top left
 // and a toolbar (build, furnish, edit, hire, hospital screens, speed, menu)
 // at the top right, floating over the game in Liquid Glass. They replace
 // Theme Hospital's bottom panel and menu bar. Lua sends the state
@@ -9,11 +9,23 @@
 
 import UIKit
 
+//! A fax message on the bottom panel (the game shows up to five).
+struct FaxState: Decodable, Hashable {
+  var index: Int
+  var kind: String
+  var title: String
+  var image: String?
+  var open: Bool
+  var dismissable: Bool
+  var timeLeft: Double?  // 0...1 for faxes that expire (emergencies, VIPs...)
+}
+
 struct ToolbarState: Decodable {
   var money = ""
   var date = ""
   var reputation: Double = 0  // 0...1
-  var messages = 0
+  var faxes: [FaxState] = []
+  var faxesWaiting = 0
   var speed = "Normal"
   var speeds: [NamedOption] = []
   var windows: [NamedOption] = []
@@ -27,7 +39,8 @@ struct ToolbarState: Decodable {
     money = (try? c.decodeIfPresent(String.self, forKey: .money)) ?? money
     date = (try? c.decodeIfPresent(String.self, forKey: .date)) ?? date
     reputation = (try? c.decodeIfPresent(Double.self, forKey: .reputation)) ?? reputation
-    messages = (try? c.decodeIfPresent(Int.self, forKey: .messages)) ?? messages
+    faxes = (try? c.decodeIfPresent([FaxState].self, forKey: .faxes)) ?? faxes
+    faxesWaiting = (try? c.decodeIfPresent(Int.self, forKey: .faxesWaiting)) ?? faxesWaiting
     speed = (try? c.decodeIfPresent(String.self, forKey: .speed)) ?? speed
     speeds = (try? c.decodeIfPresent([NamedOption].self, forKey: .speeds)) ?? speeds
     windows = (try? c.decodeIfPresent([NamedOption].self, forKey: .windows)) ?? windows
@@ -35,18 +48,21 @@ struct ToolbarState: Decodable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case money, date, reputation, messages, speed, speeds, windows, icons
+    case money, date, reputation, faxes, faxesWaiting, speed, speeds, windows, icons
   }
 }
 
 final class GameToolbar {
   private weak var parent: UIView?
   private let statusPill: UIVisualEffectView
+  private let faxPill: UIVisualEffectView  // Below the status pill, while there are faxes.
   private let toolbar: UIVisualEffectView
   private let moneyLabel = UILabel()
   private let dateLabel = UILabel()
   private let reputationBar = UIProgressView(progressViewStyle: .bar)
-  private let messageButton = UIButton(type: .system)
+  private let faxStack = UIStackView()
+  private let faxWaitingLabel = UILabel()
+  private var shownFaxes: [FaxState]?
   private let hospitalButton = UIButton(type: .system)
   private let speedButton = UIButton(type: .system)
   private var state = ToolbarState()
@@ -55,6 +71,7 @@ final class GameToolbar {
   init(in view: UIView) {
     parent = view
     statusPill = GameToolbar.glassView()
+    faxPill = GameToolbar.glassView()
     toolbar = GameToolbar.glassView()
 
     // Status pill: money and reputation, date, unread messages.
@@ -69,11 +86,19 @@ final class GameToolbar {
     let moneyStack = UIStackView(arrangedSubviews: [moneyLabel, reputationBar])
     moneyStack.axis = .vertical
     moneyStack.spacing = 3
-    configure(messageButton, symbol: "envelope.fill", label: "Messages") {
-      NativeUI.post("open_message")
-    }
-    messageButton.tintColor = .systemRed
-    let statusStack = UIStackView(arrangedSubviews: [moneyStack, dateLabel, messageButton])
+    // Fax messages: the game's own icons, oldest first, as on its bottom panel.
+    faxStack.axis = .horizontal
+    faxStack.alignment = .center
+    faxStack.spacing = 4
+    faxWaitingLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+    faxWaitingLabel.textColor = .secondaryLabel
+    let faxRow = UIStackView(arrangedSubviews: [faxStack, faxWaitingLabel])
+    faxRow.axis = .horizontal
+    faxRow.alignment = .center
+    faxRow.spacing = 6
+    faxRow.translatesAutoresizingMaskIntoConstraints = false
+    faxPill.contentView.addSubview(faxRow)
+    let statusStack = UIStackView(arrangedSubviews: [moneyStack, dateLabel])
     statusStack.axis = .horizontal
     statusStack.alignment = .center
     statusStack.spacing = 12
@@ -110,7 +135,7 @@ final class GameToolbar {
     toolStack.translatesAutoresizingMaskIntoConstraints = false
     toolbar.contentView.addSubview(toolStack)
 
-    for pill in [statusPill, toolbar] {
+    for pill in [statusPill, faxPill, toolbar] {
       pill.translatesAutoresizingMaskIntoConstraints = false
       view.addSubview(pill)
     }
@@ -125,6 +150,13 @@ final class GameToolbar {
       statusStack.centerYAnchor.constraint(equalTo: statusPill.contentView.centerYAnchor),
       reputationBar.heightAnchor.constraint(equalToConstant: 3),
 
+      faxPill.topAnchor.constraint(equalTo: statusPill.bottomAnchor, constant: 6),
+      faxPill.leadingAnchor.constraint(equalTo: statusPill.leadingAnchor),
+      faxPill.heightAnchor.constraint(equalToConstant: 46),
+      faxRow.leadingAnchor.constraint(equalTo: faxPill.contentView.leadingAnchor, constant: 10),
+      faxRow.trailingAnchor.constraint(equalTo: faxPill.contentView.trailingAnchor, constant: -10),
+      faxRow.centerYAnchor.constraint(equalTo: faxPill.contentView.centerYAnchor),
+
       toolbar.topAnchor.constraint(equalTo: guide.topAnchor, constant: 6),
       toolbar.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -8),
       toolbar.heightAnchor.constraint(equalToConstant: 44),
@@ -137,12 +169,17 @@ final class GameToolbar {
 
   func remove() {
     statusPill.removeFromSuperview()
+    faxPill.removeFromSuperview()
     toolbar.removeFromSuperview()
   }
 
+  private var hidden = false
+
   func setHidden(_ hidden: Bool) {
+    self.hidden = hidden
     statusPill.isHidden = hidden
     toolbar.isHidden = hidden
+    faxPill.isHidden = hidden || state.faxes.isEmpty
   }
 
   func update(_ new: ToolbarState) {
@@ -152,8 +189,14 @@ final class GameToolbar {
     reputationBar.progress = Float(max(0, min(1, new.reputation)))
     reputationBar.progressTintColor =
       new.reputation < 0.3 ? .systemRed : new.reputation < 0.5 ? .systemOrange : .systemGreen
-    messageButton.isHidden = new.messages == 0
-    messageButton.accessibilityValue = "\(new.messages) unread"
+    faxPill.isHidden = hidden || new.faxes.isEmpty
+    if shownFaxes != new.faxes {
+      shownFaxes = new.faxes
+      rebuildFaxes(new.faxes)
+    }
+    faxWaitingLabel.text = new.faxesWaiting > 0 ? "+\(new.faxesWaiting)" : nil
+    faxWaitingLabel.isHidden = new.faxesWaiting == 0
+    faxWaitingLabel.accessibilityLabel = "\(new.faxesWaiting) more messages waiting"
 
     // The game's own button art where Lua has made it; symbols otherwise.
     for (tool, button) in toolButtons {
@@ -203,6 +246,63 @@ final class GameToolbar {
     view.clipsToBounds = true
     view.overrideUserInterfaceStyle = .dark
     return view
+  }
+
+  // One button per fax: tap opens (or closes) it; long press offers Dismiss
+  // when the game allows it (its right click). Faxes that expire show how
+  // long they have left.
+  private func rebuildFaxes(_ faxes: [FaxState]) {
+    faxStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    faxStack.isHidden = faxes.isEmpty
+    for fax in faxes {
+      let button = UIButton(type: .custom)
+      let image = GameArt.image(fax.image, height: 28)
+      button.setImage(image ?? UIImage(systemName: "envelope.fill"), for: .normal)
+      button.tintColor = .systemRed
+      button.layer.cornerRadius = 6
+      button.layer.borderWidth = fax.open ? 2 : 0
+      button.layer.borderColor = UIColor.white.cgColor
+      button.accessibilityLabel = fax.title
+      button.accessibilityValue = fax.open ? "Open" : nil
+      button.largeContentTitle = fax.title
+      button.showsLargeContentViewer = true
+      let index = fax.index
+      button.addAction(
+        UIAction { _ in NativeUI.post("open_message", ["index": index]) }, for: .touchUpInside)
+      if fax.dismissable {
+        button.menu = UIMenu(children: [
+          UIAction(title: "Open", image: UIImage(systemName: "doc.text")) { _ in
+            NativeUI.post("open_message", ["index": index])
+          },
+          UIAction(title: "Dismiss", image: UIImage(systemName: "xmark"), attributes: .destructive) { _ in
+            NativeUI.post("dismiss_message", ["index": index])
+          },
+        ])
+      }
+      button.translatesAutoresizingMaskIntoConstraints = false
+      NSLayoutConstraint.activate([
+        button.widthAnchor.constraint(equalToConstant: 32),
+        button.heightAnchor.constraint(equalToConstant: 30),
+      ])
+      let cell = UIStackView(arrangedSubviews: [button])
+      cell.axis = .vertical
+      cell.alignment = .center
+      cell.spacing = 2
+      if let left = fax.timeLeft {
+        let bar = UIProgressView(progressViewStyle: .bar)
+        bar.progress = Float(max(0, min(1, left)))
+        bar.progressTintColor = left < 0.25 ? .systemRed : .systemOrange
+        bar.trackTintColor = UIColor.label.withAlphaComponent(0.15)
+        bar.translatesAutoresizingMaskIntoConstraints = false
+        bar.widthAnchor.constraint(equalToConstant: 26).isActive = true
+        bar.heightAnchor.constraint(equalToConstant: 3).isActive = true
+        bar.isAccessibilityElement = false
+        cell.addArrangedSubview(bar)
+        button.accessibilityValue = [button.accessibilityValue, "\(Int(left * 100))% of time left"]
+          .compactMap { $0 }.joined(separator: ", ")
+      }
+      faxStack.addArrangedSubview(cell)
+    }
   }
 
   private func button(symbol: String, label: String, action: @escaping () -> Void) -> UIButton {

@@ -492,6 +492,14 @@ local sprites = {
   status = { "Data", "Panel02V", 23, { 1, 6, 35, 36 } },
   charts = { "Data", "Panel02V", 25, { 1, 6, 35, 36 } },
   policy = { "Data", "Panel02V", 27, { 1, 6, 35, 36 } },
+  -- Fax messages on the bottom panel (UIMessage), one per kind.
+  fax_emergency = { "Data", "Panel02V", 43 },
+  fax_epidemy = { "Data", "Panel02V", 45 },
+  fax_strike = { "Data", "Panel02V", 47 },
+  fax_personality = { "Data", "Panel02V", 49 },
+  fax_information = { "Data", "Panel02V", 51 },
+  fax_disease = { "Data", "Panel02V", 53 },
+  fax_report = { "Data", "Panel02V", 55 },
   -- The hire window (UIHireStaff, QData/Req11V): a doctor's qualifications,
   -- and the abacus and computer at the ends of the skill bar (on the panel's
   -- blue, which is keyed out).
@@ -761,7 +769,7 @@ function NativeUI:toolbarState()
   end
   local date = world:date()
   local panel = ui.bottom_panel
-  local messages = panel and (#panel.message_windows + #panel.message_queue) or 0
+  local faxes, waiting = self:faxState(panel)
   local windows = {}
   for _, w in ipairs(hospital_windows) do
     windows[#windows + 1] = { id = w.id, title = w.title, image = self:spritePicture(w.picture) }
@@ -775,11 +783,47 @@ function NativeUI:toolbarState()
     money = format_money(hospital.balance),
     date = _S.date_format.daymonth:format(date:dayOfMonth(), date:monthOfYear()),
     reputation = (hospital.reputation or 500) / 1000,
-    messages = messages,
+    faxes = faxes,
+    faxes_waiting = waiting,
     speed = world:getCurrentSpeed(),
     speeds = speeds,
     windows = windows,
   }
+end
+
+local fax_titles = {
+  emergency = "Emergency", epidemy = "Epidemic", strike = "Pay demand", personality = "VIP visit",
+  information = "Information", disease = "New disease", report = "Report",
+}
+
+-- How long each timed fax had when first seen (UIMessage only counts down).
+local fax_timeouts = setmetatable({}, { __mode = "k" })
+
+--! The fax messages on the bottom panel, as the game shows them (at most five,
+-- one of each kind, oldest first), and how many more are waiting behind them.
+function NativeUI:faxState(panel)
+  local faxes = {}
+  if not panel then
+    return faxes, 0
+  end
+  for i, icon in ipairs(panel.message_windows) do
+    local time_left
+    if icon.timer then
+      fax_timeouts[icon] = math.max(fax_timeouts[icon] or 0, icon.timer)
+      -- In twentieths, so the toolbar isn't resent every tick.
+      time_left = math.ceil(icon.timer / fax_timeouts[icon] * 20) / 20
+    end
+    faxes[#faxes + 1] = {
+      index = i,
+      kind = icon.type,
+      title = fax_titles[icon.type] or "Message",
+      image = self:spritePicture("fax_" .. tostring(icon.type)),
+      open = icon.fax ~= nil,
+      dismissable = icon.can_dismiss and true or false,
+      time_left = time_left,
+    }
+  end
+  return faxes, #panel.message_queue
 end
 
 --! Sends the toolbar's state when it changed (or always, when forced).
@@ -903,10 +947,23 @@ function actions.toolbar_speed(self, p)
   end
 end
 
-function actions.open_message(self)
+--! Opens (or closes, if open) a fax, as clicking its icon does.
+function actions.open_message(self, p)
   local panel = self.app.ui and self.app.ui.bottom_panel
-  if panel and #panel.message_windows > 0 then
-    panel:openFirstMessage()
+  local icon = panel and panel.message_windows[p.index or 1]
+  if icon then
+    icon:openMessage()
+    self:updateToolbar(true)
+  end
+end
+
+--! Dismisses a fax, as right-clicking its icon does (when the game allows).
+function actions.dismiss_message(self, p)
+  local panel = self.app.ui and self.app.ui.bottom_panel
+  local icon = panel and panel.message_windows[p.index or 1]
+  if icon then
+    icon:dismissMessage()
+    self:updateToolbar(true)
   end
 end
 

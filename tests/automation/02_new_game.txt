@@ -32,13 +32,26 @@ wait 500
 screenshot 4_hire_staff
 lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
 wait 500
-# Fax messages: the bottom panel is hidden, so the status pill shows an
-# envelope that opens them.
-lua TheApp.ui:makeDebugFax()
-wait_until 10000 corsixth.require("ios.json").decode(TheApp.native.toolbar_json).messages > 0
+# Fax messages: the bottom panel is hidden, so the status pill shows each fax
+# with the game's own icon, as many as the game shows (one of each kind; the
+# rest wait behind them).
+lua local function fax(kind, text, timeout) TheApp.ui.bottom_panel:queueMessage(kind, { { text = text }, choices = { { text = "OK", choice = "close" } } }, nil, timeout) end; fax("information", "first"); fax("report", "a report"); fax("disease", "a disease"); fax("personality", "a VIP", 2000); fax("information", "second"); fax("information", "third")
+wait_until 15000 #corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes == 4
+lua local s = corsixth.require("ios.json").decode(TheApp.native.toolbar_json); local kinds = {}; for _, f in ipairs(s.faxes) do kinds[#kinds + 1] = f.kind .. (f.image and "+icon" or "") end; return table.concat(kinds, " ") .. ", waiting " .. s.faxes_waiting
+expect corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes_waiting == 2
+expect corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes[2].image ~= nil
+# The VIP fax expires, so it shows how long is left.
+expect corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes[4].time_left ~= nil
 wait 1000
-screenshot 5_message_waiting
-native_tap Messages
+screenshot 5_messages_waiting
+# Tapping an icon opens that fax.
+native_tap Report
 wait_until 3000 TheApp.ui:getWindow(UIFax) ~= nil
+expect TheApp.ui:getWindow(UIFax).icon.type == "report"
 wait 500
 screenshot 6_fax
+lua TheApp.ui:getWindow(UIFax):close()
+# Dismissing one (the game's right click) lets the next of its kind in.
+lua require("sdl").native.post("dismiss_message", '{"index":1}')
+wait_until 15000 TheApp.ui.bottom_panel.message_queue[2] == nil and #TheApp.ui.bottom_panel.message_windows == 4
+expect TheApp.ui.bottom_panel.message_windows[4].type == "information"
