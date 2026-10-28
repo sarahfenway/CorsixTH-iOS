@@ -1,0 +1,41 @@
+# Hire staff natively: the hire panel lists candidates (with the game's own
+# faces); hiring goes through the game's own placement, onto a free tile.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+native_tap Hire Staff
+wait_until 3000 require("sdl").native.screen() == "hire_staff"
+expect TheApp.ui:getWindow(UIHireStaff) == nil
+expect TheApp.world:getCurrentSpeed() ~= "Pause"
+wait 1000
+screenshot 1_hire_panel
+lua local s = TheApp.native:state().hire; local n, faces = 0, 0; for _, list in pairs(s.candidates) do for _, c in ipairs(list) do n = n + 1; if c.face and lfs.attributes(c.face, "size") then faces = faces + 1 end end end; rawset(_G, "auto_faces", n > 0 and n == faces); return faces .. " faces for " .. n .. " candidates"
+expect rawget(_G, "auto_faces")
+# Hire the first doctor: placed straight away, in the corridor.
+lua rawset(_G, "auto_staff", #TheApp.ui.hospital.staff); rawset(_G, "auto_pool", #TheApp.world.available_staff.Doctor); rawset(_G, "auto_name", corsixth.require("ios.json").text(TheApp.world.available_staff.Doctor[1]:getFullName())); return auto_name
+lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_name") .. '"}')
+wait_until 3000 #TheApp.ui.hospital.staff == rawget(_G, "auto_staff") + 1
+lua local s = TheApp.ui.hospital.staff[#TheApp.ui.hospital.staff]; rawset(_G, "auto_new", s); return corsixth.require("ios.json").text(s.profile:getFullName()) .. " at " .. tostring(s.tile_x) .. "," .. tostring(s.tile_y)
+expect rawget(_G, "auto_new").humanoid_class == "Doctor"
+expect rawget(_G, "auto_new").tile_x ~= nil and TheApp.world:getRoom(rawget(_G, "auto_new").tile_x, rawget(_G, "auto_new").tile_y) == nil
+expect #TheApp.world.available_staff.Doctor == rawget(_G, "auto_pool") - 1
+expect TheApp.ui:getWindow(UIPlaceStaff) == nil
+# The panel stays open, without the hired doctor.
+expect require("sdl").native.screen() == "hire_staff"
+wait 1000
+screenshot 2_hired
+# A receptionist (no reception desk yet, so also the corridor).
+lua rawset(_G, "auto_name", corsixth.require("ios.json").text(TheApp.world.available_staff.Receptionist[1]:getFullName())); return auto_name
+lua require("sdl").native.post("hire", '{"category":"Receptionist","index":1,"name":"' .. rawget(_G, "auto_name") .. '"}')
+wait_until 3000 #TheApp.ui.hospital.staff == rawget(_G, "auto_staff") + 2
+expect TheApp.ui.hospital.staff[#TheApp.ui.hospital.staff].humanoid_class == "Receptionist"
+expect TheApp.ui:getWindow(UIPlaceStaff) == nil
+# A stale request (the candidate list changed) hires nobody.
+lua require("sdl").native.post("hire", '{"category":"Nurse","index":1,"name":"Nobody At All"}')
+wait 500
+expect #TheApp.ui.hospital.staff == rawget(_G, "auto_staff") + 2
+lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
+wait 1000
+screenshot 3_staff_on_map

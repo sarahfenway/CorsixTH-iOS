@@ -26,10 +26,12 @@ screenshot 3_build_room
 lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
 wait 500
 native_tap Hire Staff
-wait_until 3000 TheApp.ui:getWindow(UIHireStaff) ~= nil
+wait_until 3000 require("sdl").native.screen() == "hire_staff"
+expect TheApp.ui:getWindow(UIHireStaff) == nil
 wait 500
 screenshot 4_hire_staff
-lua TheApp.ui:getWindow(UIHireStaff):close()
+lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
+wait 500
 # Fax messages: the bottom panel is hidden, so the status pill shows an
 # envelope that opens them.
 lua TheApp.ui:makeDebugFax()

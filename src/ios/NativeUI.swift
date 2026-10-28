@@ -87,7 +87,8 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     }
     model.apply(json: json, replace: true)
     let style: Style =
-      screen == "main_menu" ? .mainMenu : screen == "room_catalog" ? .catalog : .sheet
+      screen == "main_menu"
+      ? .mainMenu : (screen == "room_catalog" || screen == "hire_staff") ? .catalog : .sheet
     if (host != nil || panel != nil) && hostStyle != style {
       closeCurrent(animated: false)
     }
@@ -493,6 +494,27 @@ struct RoomOption: Codable, Hashable, Identifiable {
   var image: String?
 }
 
+struct HireState: Codable, Hashable {
+  var categories: [NamedOption]
+  var candidates: [String: [Candidate]]
+}
+
+struct Candidate: Codable, Hashable, Identifiable {
+  var index: Int
+  var name: String  // As the game has it; sent back when hiring.
+  var displayName: String
+  var wage: String
+  var affordable: Bool
+  var skill: Double
+  var rank: String?
+  var surgeon: Bool
+  var psychiatrist: Bool
+  var researcher: Bool
+  var description: String
+  var face: String?
+  var id: String { "\(index) \(name)" }
+}
+
 struct GameSettings: Codable, Hashable {
   var soundVolume: Double = 1
   var announcementVolume: Double = 1
@@ -527,6 +549,7 @@ struct NativeState: Codable {
   var canTutorial: Bool?
   var campaigns: [Campaign]?
   var rooms: [RoomOption]?
+  var hire: HireState?
   var levels: [Level]?
   var canContinue: Bool?
 }

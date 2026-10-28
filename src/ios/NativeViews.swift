@@ -22,24 +22,9 @@ struct NativeRootView: View {
       case "settings":
         NavigationStack { SettingsView().toolbar { DoneButton() } }
       case "room_catalog":
-        if model.inPanel {
-          // No navigation container in the panel: it would pad for the
-          // screen's safe area, which the panel doesn't touch.
-          VStack(spacing: 0) {
-            HStack {
-              Text("Build Room").font(.headline)
-              Spacer()
-              Button("Done") { NativeUI.shared.dismiss(notifyLua: true) }.bold()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            RoomCatalogView()
-          }
-          .background(Color(uiColor: .systemBackground))
-          .ignoresSafeArea(.container, edges: .horizontal)
-        } else {
-          NavigationStack { RoomCatalogView().toolbar { DoneButton() } }
-        }
+        PanelOrSheet(title: "Build Room") { RoomCatalogView() }
+      case "hire_staff":
+        PanelOrSheet(title: "Hire Staff") { HireStaffView() }
       default:
         GameMenuView()
       }
@@ -698,5 +683,143 @@ struct GamePicture: View {
     guard let image = UIImage(contentsOfFile: path) else { return nil }
     cache[path] = image
     return image
+  }
+}
+
+//! A side panel (wide screens) or a sheet with a navigation bar.
+struct PanelOrSheet<Content: View>: View {
+  @EnvironmentObject var model: NativeModel
+  let title: String
+  @ViewBuilder let content: () -> Content
+
+  var body: some View {
+    if model.inPanel {
+      // No navigation container in the panel: it would pad for the
+      // screen's safe area, which the panel doesn't touch.
+      VStack(spacing: 0) {
+        HStack {
+          Text(title).font(.headline)
+          Spacer()
+          Button("Done") { NativeUI.shared.dismiss(notifyLua: true) }.bold()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        content()
+      }
+      .background(Color(uiColor: .systemBackground))
+      .ignoresSafeArea(.container, edges: .horizontal)
+    } else {
+      NavigationStack {
+        content()
+          .navigationTitle(title)
+          .navigationBarTitleDisplayMode(.inline)
+          .toolbar { DoneButton() }
+      }
+    }
+  }
+}
+
+// MARK: - Hire staff
+
+struct HireStaffView: View {
+  @EnvironmentObject var model: NativeModel
+  @State private var category = "Doctor"
+
+  private var hire: HireState? { model.state.hire }
+
+  var body: some View {
+    VStack(spacing: 8) {
+      if let hire = hire {
+        Picker("Staff", selection: $category) {
+          ForEach(hire.categories) { option in
+            Text(option.title).tag(option.id)
+          }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 12)
+        let candidates = hire.candidates[category] ?? []
+        if candidates.isEmpty {
+          Spacer()
+          Text("Nobody is looking for work at the moment. New people apply each month.")
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
+            .padding()
+          Spacer()
+        } else {
+          ScrollView {
+            LazyVStack(spacing: 10) {
+              Text("\(candidates.count) looking for work")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+              ForEach(candidates) { candidate in
+                CandidateCard(category: category, candidate: candidate)
+              }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+          }
+        }
+      }
+    }
+  }
+}
+
+struct CandidateCard: View {
+  let category: String
+  let candidate: Candidate
+
+  private var qualifications: [String] {
+    var list: [String] = []
+    if candidate.surgeon { list.append("Surgeon") }
+    if candidate.psychiatrist { list.append("Psychiatrist") }
+    if candidate.researcher { list.append("Researcher") }
+    return list
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .top, spacing: 12) {
+        GamePicture(path: candidate.face)
+          .frame(width: 56, height: 64)
+          .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        VStack(alignment: .leading, spacing: 4) {
+          Text(candidate.displayName).font(.headline)
+          HStack(spacing: 6) {
+            if let rank = candidate.rank { Text(rank) }
+            ForEach(qualifications, id: \.self) { Text($0).foregroundStyle(.tint) }
+          }
+          .font(.caption.weight(.semibold))
+          HStack(spacing: 6) {
+            Text("Skill").font(.caption).foregroundStyle(.secondary)
+            ProgressView(value: candidate.skill)
+              .tint(candidate.skill < 0.35 ? .orange : .green)
+          }
+          Text(candidate.wage)
+            .font(.caption)
+            .monospacedDigit()
+            .foregroundStyle(candidate.affordable ? Color.secondary : Color.red)
+        }
+      }
+      if !candidate.description.isEmpty {
+        Text(candidate.description)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Button {
+        NativeUI.post(
+          "hire", ["category": category, "index": candidate.index, "name": candidate.name])
+      } label: {
+        Text("Hire").frame(maxWidth: .infinity)
+      }
+      .buttonStyle(.borderedProminent)
+      .disabled(!candidate.affordable)
+      .accessibilityLabel("Hire \(candidate.displayName)")
+    }
+    .padding(12)
+    .background(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Color(uiColor: .secondarySystemBackground)))
   }
 }

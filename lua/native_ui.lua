@@ -50,10 +50,26 @@ local replaced_windows = {
   UIFolder = "settings",
   UIHotkeyAssign = "settings",
   UIBuildRoom = "room_catalog",
+  UIHireStaff = "hire_staff",
 }
 
 -- Native screens that leave the game running (they don't cover the map).
-local unpaused_screens = { main_menu = true, room_catalog = true }
+local unpaused_screens = { main_menu = true, room_catalog = true, hire_staff = true }
+
+local staff_categories = {
+  { id = "Doctor", title = "Doctors" },
+  { id = "Nurse", title = "Nurses" },
+  { id = "Handyman", title = "Handymen" },
+  { id = "Receptionist", title = "Reception" },
+}
+
+--! "TOXICITY" -> "Toxicity": Theme Hospital writes names in capitals.
+local function title_case(text)
+  if text ~= text:upper() then
+    return text
+  end
+  return (text:lower():gsub("(%a)([%w']*)", function(a, b) return a:upper() .. b end))
+end
 
 -- Rooms that can be built with Quick Build (lua/quick_build.lua), by id: every
 -- Theme Hospital room, each checked by tests/automation/09_quick_build_all.txt.
@@ -310,11 +326,7 @@ function NativeUI:levelName()
   if not map then return nil end
   local name = map.level_name and json.text(map.level_name)
   if name and name ~= "" then
-    if name == name:upper() then
-      -- Theme Hospital shouts its level names ("TOXICITY").
-      name = name:lower():gsub("(%a)([%w']*)", function(a, b) return a:upper() .. b end)
-    end
-    return name
+    return title_case(name)
   end
   if tonumber(map.level_number) then
     return "Level " .. map.level_number
@@ -455,7 +467,110 @@ function NativeUI:spritePicture(name)
   return path
 end
 
---! The rooms the player can build now, as UIBuildRoom lists them.
+--! A picture of a job candidate's face, drawn by the game as the hire window
+-- does (StaffProfile:drawFace). Returns the PNG's path, or nil.
+function NativeUI:facePicture(profile)
+  if not (profile.hair_index and profile.face_index and profile.chin_index) then
+    return nil
+  end
+  local path = self:pictureDir() .. ("face_%d_%d_%d_v1.png"):format(profile.hair_index,
+      profile.face_index, profile.chin_index)
+  if lfs.attributes(path, "size") then
+    return path
+  end
+  local ok, err = pcall(function()
+    -- The same face parts as UIHireStaff.
+    self.face_parts = self.face_parts or self.app.gfx:loadRaw("Face01V", 65, 1350, nil, "Data",
+        "MPalette.dat", false, { flags = DrawFlags.Nearest })
+    local done, why = SDL.native.renderToPNG(path, 65, 75, function()
+      profile:drawFace(self.app.video, 0, 0, self.face_parts, 1)
+    end)
+    if not done then error(why) end
+  end)
+  if not ok then
+    print("Native UI: couldn't make a picture of a face: " .. tostring(err))
+    return nil
+  end
+  return path
+end
+
+--! The job candidates, as UIHireStaff shows them.
+function NativeUI:hireState()
+  local world, hospital = self.app.world, self.app.ui.hospital
+  local categories, candidates = {}, {}
+  for _, category in ipairs(staff_categories) do
+    local list = {}
+    for index, profile in ipairs(world.available_staff[category.id] or {}) do
+      local rank
+      if category.id == "Doctor" then
+        rank = profile.is_consultant and "Consultant" or profile.is_junior and "Junior" or "Doctor"
+      end
+      list[#list + 1] = {
+        index = index,
+        name = json.text(profile:getFullName()),
+        display_name = title_case(json.text(profile:getFullName())),
+        wage = NativeUI.formatMoney(profile.wage) .. " a month",
+        affordable = hospital.balance >= profile.wage,
+        skill = profile.skill,
+        rank = rank,
+        surgeon = (profile.is_surgeon or 0) >= 1.0,
+        psychiatrist = (profile.is_psychiatrist or 0) >= 1.0,
+        researcher = (profile.is_researcher or 0) >= 1.0,
+        description = profile.desc and json.text(profile.desc) or "",
+        face = self:facePicture(profile),
+      }
+    end
+    categories[#categories + 1] = { id = category.id, title = category.title }
+    candidates[category.id] = list
+  end
+  return { categories = categories, candidates = candidates }
+end
+
+--! Puts a newly hired person (in a UIPlaceStaff that's waiting for a click)
+-- somewhere sensible, by "clicking" there: the game checks the tile and
+-- does the rest. Receptionists go to an unstaffed reception desk if there is
+-- one; everyone else to a corridor near the middle of the screen, from where
+-- the game calls them to rooms that need them. Returns true if placed.
+function NativeUI:placeStaff(placer)
+  local app, ui, world = self.app, self.app.ui, self.app.world
+  if not world.user_actions_allowed then
+    return false
+  end
+  local function try(x, y)
+    placer.tile_x, placer.tile_y = x, y
+    if placer:_isValidStaffPlacement() then
+      placer:onMouseUp("left", 0, 0)
+      return true
+    end
+    return false
+  end
+  if placer.profile:isType("Receptionist") then
+    for _, objects in pairs(world.objects) do
+      for _, object in ipairs(objects) do
+        if object.object_type.id == "reception_desk" and not object.receptionist and
+            try(object.tile_x, object.tile_y) then
+          return true
+        end
+      end
+    end
+  end
+  local cx, cy = ui:ScreenToWorld(app.config.width / 2, app.config.height / 2)
+  cx, cy = math.floor(cx), math.floor(cy)
+  for radius = 0, 30 do
+    for dy = -radius, radius do
+      for dx = -radius, radius do
+        if math.max(math.abs(dx), math.abs(dy)) == radius then
+          local x, y = cx + dx, cy + dy
+          if x >= 1 and y >= 1 and x <= app.map.width and y <= app.map.height and
+              world:getRoom(x, y) == nil and try(x, y) then
+            return true
+          end
+        end
+      end
+    end
+  end
+  return false
+end
 function NativeUI:roomList()
   local app = self.app
   local hospital = app.ui.hospital
@@ -507,6 +622,7 @@ function NativeUI:state()
     state.level_name = self:levelName()
     state.can_restart = app.map ~= nil
     state.rooms = self:roomList()
+    state.hire = self:hireState()
   else
     local difficulties = {}
     if app.fs:fileExists("Levels", "Easy01.SAM") then
@@ -678,6 +794,39 @@ function actions.pick_room(self, p)
     self:message(message)
   end
   ui:addWindow(UIEditRoom(ui, room))
+end
+
+function actions.hire(self, p)
+  local app = self.app
+  local ui, world = app.ui, app.world
+  if not world or not ui.hospital then return end
+  local pool = world.available_staff[p.category]
+  local profile = pool and pool[tonumber(p.index) or 0]
+  -- The list changes every month; only hire the person the player saw.
+  if not profile or json.text(profile:getFullName()) ~= p.name then
+    self:refresh("That person is no longer available.")
+    return
+  end
+  -- As UIHireStaff:hire.
+  ui:tutorialStep(2, { 3, 4, 5 }, 6)
+  ui:tutorialStep(4, 3, 4)
+  if ui.hospital.balance < profile.wage then
+    UIHireStaff.cannotAfford({ world = world })
+    ui:playSound("wrong2.wav")
+    return
+  end
+  ui:playSound("YesX.wav")
+  table.remove(pool, tonumber(p.index))
+  local placer = UIPlaceStaff(ui, profile, app.config.width / 2, app.config.height / 2)
+  ui:addWindow(placer)
+  if not self:placeStaff(placer) then
+    -- The game's own placement carries on: the person follows the cursor
+    -- until the player taps where they should go.
+    SDL.native.dismiss()
+    self:message("Tap where " .. json.text(profile:getFullName()) .. " should start work.")
+    return
+  end
+  self:refresh()
 end
 
 function actions.quick_build_drag(self, p)
