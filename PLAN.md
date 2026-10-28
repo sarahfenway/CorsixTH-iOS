@@ -151,6 +151,14 @@ screenshots, then on Sarah's iPhone and iPad.
 
 ---
 
+## Phase 1b: touch-first building (started 28 Oct 2026)
+
+Quick Build for the GP's office is done in the simulator (spec and plan in `docs/superpowers/`):
+native room catalogue (side panel), proposed outline with finger handles over the engine's
+blueprint, built by driving the engine's own editor. Next candidates: enable Quick Build for more
+rooms (furniture preferences per room), a native hire screen with automatic staff placement, and
+moving furniture by finger.
+
 ## Phase 2: make the remaining original UI touch-friendly
 
 1. **Safe areas.**

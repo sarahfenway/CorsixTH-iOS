@@ -21,6 +21,8 @@ struct NativeRootView: View {
         NavigationStack { SaveLoadView(mode: .load).toolbar { DoneButton() } }
       case "settings":
         NavigationStack { SettingsView().toolbar { DoneButton() } }
+      case "room_catalog":
+        NavigationStack { RoomCatalogView().toolbar { DoneButton() } }
       default:
         GameMenuView()
       }
@@ -512,5 +514,52 @@ struct DescribedRow: View {
           .lineLimit(4)
       }
     }
+  }
+}
+
+// MARK: - Build room catalogue
+
+struct RoomCatalogView: View {
+  @EnvironmentObject var model: NativeModel
+
+  private var categories: [String] {
+    var seen: [String] = []
+    for room in model.state.rooms ?? [] where !seen.contains(room.category) {
+      seen.append(room.category)
+    }
+    return seen
+  }
+
+  var body: some View {
+    List {
+      ForEach(categories, id: \.self) { category in
+        Section(category) {
+          ForEach((model.state.rooms ?? []).filter { $0.category == category }) { room in
+            Button {
+              NativeUI.post("pick_room", ["id": room.id])
+            } label: {
+              HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(room.name).foregroundStyle(room.affordable ? .primary : .secondary)
+                  if room.quick {
+                    Label("Quick Build", systemImage: "bolt.fill")
+                      .font(.caption)
+                      .foregroundStyle(.tint)
+                  }
+                }
+                Spacer()
+                Text(room.cost)
+                  .monospacedDigit()
+                  .foregroundStyle(room.affordable ? .secondary : Color.red)
+              }
+            }
+            .disabled(!room.affordable)
+            .accessibilityLabel(room.name)
+          }
+        }
+      }
+    }
+    .navigationTitle("Build Room")
+    .navigationBarTitleDisplayMode(.inline)
   }
 }

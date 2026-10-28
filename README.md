@@ -79,7 +79,9 @@ If you'd rather click wherever you touch, set `touch_controls = [[direct]]` in
 | Long press or two-finger tap | Right click |
 | Two-finger drag / pinch | Moves the map / zooms |
 
-Menus are native iOS screens. In a game, the bar at the top right builds rooms, furnishes
+Menus are native iOS screens. In a game, the bar at the top right builds rooms (a panel lists them;
+a GP's Office can be Quick Built: the game suggests a spot, you drag the handles to move or resize it,
+then tap Build and the door and furniture are placed for you), furnishes
 corridors, edits rooms and hires staff; its building button opens the hospital screens (staff,
 town map, research, casebook, graphs, bank...), the play button sets the game speed and the ••• button
 opens the game menu (save, load, settings, restart, quit), which pauses the game. Money, the date

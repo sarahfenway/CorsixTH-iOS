@@ -16,10 +16,12 @@ expect TheApp.ui:getWindow(UIInformation) ~= nil
 lua TheApp.ui:getWindow(UIInformation):close()
 wait 300
 native_tap Build Room
-wait_until 3000 TheApp.ui:getWindow(UIBuildRoom) ~= nil
+wait_until 3000 require("sdl").native.screen() == "room_catalog"
+expect TheApp.ui:getWindow(UIBuildRoom) == nil
 wait 500
 screenshot 3_build_room
-lua TheApp.ui:getWindow(UIBuildRoom):close()
+lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
+wait 500
 native_tap Hire Staff
 wait_until 3000 TheApp.ui:getWindow(UIHireStaff) ~= nil
 wait 500

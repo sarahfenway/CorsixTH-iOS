@@ -26,6 +26,7 @@ SOFTWARE. --]]
 -- and App isn't persisted.
 
 local json = corsixth.require("ios.json")
+local QuickBuild = corsixth.require("ios.quick_build")
 local SDL = require("sdl")
 local pathsep = package.config:sub(1, 1)
 
@@ -47,6 +48,20 @@ local replaced_windows = {
   UICustomise = "settings",
   UIFolder = "settings",
   UIHotkeyAssign = "settings",
+  UIBuildRoom = "room_catalog",
+}
+
+-- Native screens that leave the game running (they don't cover the map).
+local unpaused_screens = { main_menu = true, room_catalog = true }
+
+-- Rooms that can be built with Quick Build (lua/quick_build.lua), by id.
+local quick_build_rooms = { gp = true }
+
+local room_categories = {
+  { id = "diagnosis", title = "Diagnosis" },
+  { id = "treatment", title = "Treatment" },
+  { id = "clinics", title = "Clinics" },
+  { id = "facilities", title = "Facilities" },
 }
 
 local speeds = {
@@ -113,7 +128,7 @@ end
 
 function NativeUI:show(screen)
   local app = self.app
-  if app.world and screen ~= "main_menu" then
+  if app.world and not unpaused_screens[screen] then
     self:pauseGame()
   end
   SDL.native.show(screen, json.encode(self:state()))
@@ -126,6 +141,20 @@ function NativeUI:refresh(message)
   local state = self:state()
   state.message = message
   SDL.native.update(json.encode(state))
+end
+
+--! Shows a native alert.
+function NativeUI:message(text)
+  SDL.native.show("alert", json.encode({ message = text }))
+end
+
+--! Ends a Quick Build in progress (a game is being loaded or left).
+function NativeUI:endQuickBuild()
+  if self.quick_build then
+    self.quick_build:cancel()
+    self.quick_build = nil
+  end
+  SDL.native.setQuickBuild(nil)
 end
 
 --! Closes the native screen and lets the game carry on.
@@ -333,6 +362,43 @@ function NativeUI:findCampaigns()
   return campaigns
 end
 
+--! The rooms the player can build now, as UIBuildRoom lists them.
+function NativeUI:roomList()
+  local app = self.app
+  local hospital = app.ui.hospital
+  local world = app.world
+  local rooms = {}
+  for _, discovery in pairs(hospital.room_discoveries) do
+    local room = discovery.room
+    -- NB: Unimplemented rooms are hidden unless in debug mode (as UIBuildRoom)
+    if discovery.is_discovered and (app.config.debug or room.class) then
+      for _, category in ipairs(room_categories) do
+        if room.categories[category.id] then
+          local cost = world.free_build_mode and 0 or
+              hospital.research.research_progress[room].build_cost
+          rooms[#rooms + 1] = {
+            id = room.id,
+            name = json.text(room.name),
+            category = category.title,
+            order = room.categories[category.id],
+            cost = NativeUI.formatMoney(cost),
+            affordable = world.free_build_mode or hospital.balance >= cost,
+            quick = quick_build_rooms[room.id] or false,
+          }
+          break
+        end
+      end
+    end
+  end
+  local rank = {}
+  for i, category in ipairs(room_categories) do rank[category.title] = i end
+  table.sort(rooms, function(a, b)
+    if a.category ~= b.category then return rank[a.category] < rank[b.category] end
+    return a.order < b.order
+  end)
+  return rooms
+end
+
 function NativeUI:state()
   local app = self.app
   local world = app.world
@@ -346,6 +412,7 @@ function NativeUI:state()
   if world then
     state.level_name = self:levelName()
     state.can_restart = app.map ~= nil
+    state.rooms = self:roomList()
   else
     local difficulties = {}
     if app.fs:fileExists("Levels", "Easy01.SAM") then
@@ -374,6 +441,7 @@ local function format_money(amount)
   text = text:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
   return (amount < 0 and "-$" or "$") .. text
 end
+NativeUI.formatMoney = format_money
 
 function NativeUI:toolbarState()
   local app = self.app
@@ -418,6 +486,18 @@ function NativeUI:onTick()
     -- A game is running (resumed at launch, say), so the main menu is done.
     if SDL.native.screen() == "main_menu" then
       SDL.native.dismiss()
+    end
+  end
+  if self.quick_build then
+    if self.quick_build:onTick() then
+      self.quick_build = nil
+    end
+  elseif self.tick_count % 5 == 0 then
+    -- A room editor hidden by Quick Build but no longer driven by it (for
+    -- example in a game saved mid-build) becomes CorsixTH's normal editor.
+    local edit = self.app.ui and self.app.ui:getWindow(UIEditRoom)
+    if edit and edit.visible == false then
+      edit.visible = true
     end
   end
 end
@@ -465,6 +545,65 @@ function actions.open_message(self)
   end
 end
 
+function actions.pick_room(self, p)
+  local app = self.app
+  local ui = app.ui
+  if not app.world or not ui.hospital then return end
+  local room
+  for _, discovery in pairs(ui.hospital.room_discoveries) do
+    if discovery.room.id == p.id and discovery.is_discovered then
+      room = discovery.room
+    end
+  end
+  if not room then return end
+  SDL.native.dismiss()
+  self:endQuickBuild()
+  -- The same checks as UIBuildRoom:buildRoom.
+  local cost = app.world.free_build_mode and 0 or
+      ui.hospital.research.research_progress[room].build_cost
+  if not app.world.free_build_mode and ui.hospital.balance < cost then
+    ui.adviser:say(_A.warnings.money_very_low_take_loan, false, true)
+    ui:playSound("Wrong2.wav")
+    return
+  end
+  local fullscreen = ui:getWindow(UIFullscreen)
+  if fullscreen then
+    fullscreen:close()
+  end
+  if quick_build_rooms[room.id] then
+    local qb, message = QuickBuild.start(self, room)
+    if qb then
+      self.quick_build = qb
+      return
+    end
+    self:message(message)
+  end
+  ui:addWindow(UIEditRoom(ui, room))
+end
+
+function actions.quick_build_drag(self, p)
+  if self.quick_build then
+    self.quick_build:drag(p.handle, tonumber(p.x) or 0, tonumber(p.y) or 0, p.ended)
+  end
+end
+
+function actions.quick_build_build(self)
+  if self.quick_build then
+    self.quick_build:build()
+  end
+end
+
+function actions.quick_build_by_hand(self)
+  if self.quick_build then
+    self.quick_build:byHand(nil)
+    self.quick_build = nil
+  end
+end
+
+function actions.quick_build_cancel(self)
+  self:endQuickBuild()
+end
+
 function actions.set_speed(self, p)
   if self.app.world and p.speed then
     self.resume_speed = p.speed
@@ -504,6 +643,7 @@ function actions.load(self, p)
   local path = tostring(p.path or "")
   if not is_inside(app.savegame_dir, path) then return end
   SDL.native.dismiss()
+  self:endQuickBuild()
   self.resume_speed = nil
   local ok, err = pcall(app.load, app, path)
   if not ok then
@@ -541,6 +681,7 @@ end
 function actions.restart(self)
   local app = self.app
   SDL.native.dismiss()
+  self:endQuickBuild()
   self.resume_speed = nil
   if app.map then
     self.confirm_next = true
@@ -551,6 +692,7 @@ end
 
 function actions.quit_to_menu(self)
   SDL.native.dismiss()
+  self:endQuickBuild()
   self.resume_speed = nil
   self.app:loadMainMenu()
 end
@@ -618,6 +760,7 @@ end
 -- Starts a game from the main menu (the native screen goes first).
 local function start(self, fn)
   SDL.native.dismiss()
+  self:endQuickBuild()
   fn()
   if not self.app.world then
     -- Didn't work: CorsixTH has shown why; offer the menu again.

@@ -41,7 +41,8 @@ struct lua_State;
 namespace native_bridge {
 
 //! Registers SDL.native: available(), show(screen, json), update(json),
-//! dismiss(), setToolbar(json or nil), post(action, json) (for tests),
+//! dismiss(), setToolbar(json or nil), setQuickBuild(json or nil),
+//! post(action, json) (for tests),
 //! screen() (the screen showing, or nil), tap(label) (tests: activates a
 //! native control by its accessibility label) and setCursorSpeed(multiplier).
 int luaopen(lua_State* L);

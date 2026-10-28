@@ -1,0 +1,49 @@
+# Quick Build: a GP's office from the native toolbar. The engine's own room
+# editor checks, charges for and builds it.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua rawset(_G, "auto_money", TheApp.ui.hospital.balance); return auto_money
+native_tap Build Room
+wait_until 3000 require("sdl").native.screen() == "room_catalog"
+wait 1000
+screenshot 1_catalog
+expect TheApp.world:getCurrentSpeed() ~= "Pause"
+# Other rooms still go through CorsixTH's own editor.
+lua require("sdl").native.post("pick_room", '{"id":"psych"}')
+wait_until 3000 TheApp.ui:getWindow(UIEditRoom) ~= nil
+expect TheApp.ui:getWindow(UIEditRoom).visible ~= false
+expect TheApp.native.quick_build == nil
+expect require("sdl").native.screen() == nil
+lua TheApp.ui:getWindow(UIEditRoom):cancel()
+wait 300
+expect TheApp.ui:getWindow(UIEditRoom) == nil
+# The GP's office gets Quick Build.
+lua TheApp.native:show("room_catalog")
+wait 800
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 1000
+expect TheApp.native.quick_build:isValid()
+screenshot 2_proposal
+# Drag the move handle two tiles along, then back (game pixels, as the overlay sends them).
+lua local r = TheApp.native.quick_build.rect; rawset(_G, "auto_x", r.x); local ui = TheApp.ui; local x1, y1 = ui:WorldToScreen(r.x + r.w / 2, r.y + r.h / 2); local x2, y2 = ui:WorldToScreen(r.x + r.w / 2 + 2, r.y + r.h / 2); rawset(_G, "auto_drag", {x1, y1, x2, y2}); local sdl = require("sdl"); sdl.native.post("quick_build_drag", ('{"handle":"move","x":%f,"y":%f,"ended":false}'):format(x1, y1)); sdl.native.post("quick_build_drag", ('{"handle":"move","x":%f,"y":%f,"ended":true}'):format(x2, y2))
+wait 500
+expect TheApp.native.quick_build.rect.x == rawget(_G, "auto_x") + 2
+screenshot 3_moved
+lua local d = rawget(_G, "auto_drag"); local sdl = require("sdl"); sdl.native.post("quick_build_drag", ('{"handle":"move","x":%f,"y":%f,"ended":false}'):format(d[3], d[4])); sdl.native.post("quick_build_drag", ('{"handle":"move","x":%f,"y":%f,"ended":true}'):format(d[1], d[2]))
+wait 500
+expect TheApp.native.quick_build.rect.x == rawget(_G, "auto_x")
+expect TheApp.native.quick_build:isValid()
+native_tap Build
+wait_until 20000 TheApp.native.quick_build == nil
+wait 1500
+screenshot 4_built
+lua local n, found = {}, nil; for _, room in pairs(TheApp.world.rooms) do if room.room_info.id == "gp" then found = room; for o in pairs(room.objects) do n[o.object_type.id] = (n[o.object_type.id] or 0) + 1 end end end; rawset(_G, "auto_gp", found); rawset(_G, "auto_objects", n); return found and ("built %s, desk %s, cabinet %s, chair %s"):format(tostring(found.built), tostring(n.desk), tostring(n.cabinet), tostring(n.chair)) or "no GP room"
+expect rawget(_G, "auto_gp") ~= nil and rawget(_G, "auto_gp").built
+expect rawget(_G, "auto_objects").desk == 1 and rawget(_G, "auto_objects").cabinet == 1 and rawget(_G, "auto_objects").chair == 1
+expect TheApp.ui:getWindow(UIEditRoom) == nil
+lua TheApp.ui.hospital.balance
+expect TheApp.ui.hospital.balance < rawget(_G, "auto_money")

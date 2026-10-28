@@ -31,6 +31,11 @@ public func cthNativeSetToolbar(_ json: UnsafePointer<CChar>) {
   NativeUI.shared.setToolbar(json: String(cString: json))
 }
 
+@_cdecl("cth_native_set_quick_build")
+public func cthNativeSetQuickBuild(_ json: UnsafePointer<CChar>) {
+  NativeUI.shared.setQuickBuild(json: String(cString: json))
+}
+
 @_cdecl("cth_native_screen")
 public func cthNativeScreen() -> UnsafePointer<CChar>? {
   return NativeUI.shared.currentScreenCString()
@@ -50,7 +55,9 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
 
   let model = NativeModel()
   private var host: UIViewController?
-  private var hostIsMainMenu = false
+  private var panel: UIViewController?
+  private var hostStyle = Style.sheet
+  private var quickBuild: QuickBuildOverlay?
   private var toolbar: GameToolbar?
   private weak var textAlert: UIAlertController?
   private var screenCString: UnsafeMutablePointer<CChar>?
@@ -62,21 +69,32 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     cth_native_post(action, json)
   }
 
+  // How a screen is shown.
+  private enum Style {
+    case mainMenu  // A card over the game's own menu background.
+    case sheet  // A form sheet that pauses the game.
+    case catalog  // Room catalogue: half-height sheet, or a side panel on wide screens.
+  }
+
   func show(screen: String, json: String) {
     if screen == "text_input" {
       showTextInput(json: json)
       return
     }
+    if screen == "alert" {
+      showAlert(json: json)
+      return
+    }
     model.apply(json: json, replace: true)
-    let isMainMenu = screen == "main_menu"
-    if host != nil && hostIsMainMenu != isMainMenu {
-      host?.dismiss(animated: false)
-      host = nil
+    let style: Style =
+      screen == "main_menu" ? .mainMenu : screen == "room_catalog" ? .catalog : .sheet
+    if (host != nil || panel != nil) && hostStyle != style {
+      closeCurrent(animated: false)
     }
     model.screen = screen
     model.navigationID = UUID()
-    if host == nil {
-      present(mainMenu: isMainMenu)
+    if host == nil && panel == nil {
+      present(style)
     }
   }
 
@@ -84,53 +102,104 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     if !notifyLua, let alert = textAlert {
       alert.dismiss(animated: true)
     }
-    guard let host = host else { return }
-    self.host = nil
-    model.screen = ""
-    if let coordinator = host.transitionCoordinator, host.isBeingPresented {
-      // Still appearing (e.g. the main menu just before a resumed game
-      // loads): close it once it's up.
-      coordinator.animate(alongsideTransition: nil) { _ in host.dismiss(animated: true) }
-    } else if host.presentingViewController != nil {
-      host.dismiss(animated: true)
-    }
+    guard host != nil || panel != nil else { return }
+    closeCurrent(animated: true)
     if notifyLua {
       NativeUI.post("dismissed")
     }
   }
 
+  private func closeCurrent(animated: Bool) {
+    model.screen = ""
+    if let panel = panel {
+      self.panel = nil
+      UIView.animate(
+        withDuration: animated ? 0.2 : 0, animations: { panel.view.alpha = 0 },
+        completion: { _ in
+          panel.willMove(toParent: nil)
+          panel.view.removeFromSuperview()
+          panel.removeFromParent()
+        })
+    }
+    guard let host = host else { return }
+    self.host = nil
+    if let coordinator = host.transitionCoordinator, host.isBeingPresented {
+      // Still appearing (e.g. the main menu just before a resumed game
+      // loads): close it once it's up.
+      coordinator.animate(alongsideTransition: nil) { _ in host.dismiss(animated: animated) }
+    } else if host.presentingViewController != nil {
+      host.dismiss(animated: animated)
+    }
+  }
+
   func currentScreenCString() -> UnsafePointer<CChar>? {
     free(screenCString)
-    screenCString = strdup(host == nil ? "" : model.screen)
+    screenCString = strdup(host == nil && panel == nil ? "" : model.screen)
     return UnsafePointer(screenCString)
   }
 
-  private func present(mainMenu: Bool, attempt: Int = 0) {
+  private func present(_ style: Style, attempt: Int = 0) {
     guard let parent = topViewController(), parent.view.window != nil else {
       // At start-up the game's view may not be on screen yet; try again
       // once the run loop has turned.
       if attempt < 50 {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-          guard let self = self, self.host == nil, !self.model.screen.isEmpty else { return }
-          self.present(mainMenu: mainMenu, attempt: attempt + 1)
+          guard let self = self, self.host == nil, self.panel == nil, !self.model.screen.isEmpty
+          else { return }
+          self.present(style, attempt: attempt + 1)
         }
       }
       return
     }
     let controller = UIHostingController(rootView: NativeRootView().environmentObject(model))
-    if mainMenu {
-      // A card over the game's own menu background, which can't be swiped
-      // away.
+    hostStyle = style
+    switch style {
+    case .mainMenu:
+      // Can't be swiped away.
       controller.modalPresentationStyle = .overFullScreen
       controller.modalTransitionStyle = .crossDissolve
       controller.view.backgroundColor = .clear
       controller.isModalInPresentation = true
-    } else {
+    case .sheet:
       controller.modalPresentationStyle = .formSheet
+      controller.presentationController?.delegate = self
+    case .catalog:
+      if let root = rootViewController(), parent === root, root.view.bounds.width >= 600 {
+        // A panel beside the map, which stays in play. (The game is always
+        // landscape, so this is every phone and iPad; iOS only offers full
+        // height sheets in landscape on phones.)
+        root.addChild(controller)
+        let view = controller.view!
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.layer.cornerRadius = 24
+        view.layer.cornerCurve = .continuous
+        view.clipsToBounds = true
+        root.view.addSubview(view)
+        let guide = root.view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+          view.trailingAnchor.constraint(equalTo: guide.trailingAnchor, constant: -8),
+          view.topAnchor.constraint(equalTo: guide.topAnchor, constant: 58),
+          view.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -8),
+          view.widthAnchor.constraint(equalToConstant: 360),
+        ])
+        controller.didMove(toParent: root)
+        panel = controller
+        return
+      }
+      // Narrow windows (e.g. iPad split view): a half-height sheet; the map
+      // above stays usable.
+      controller.modalPresentationStyle = .pageSheet
+      if let sheet = controller.sheetPresentationController {
+        sheet.detents = [.medium(), .large()]
+        sheet.largestUndimmedDetentIdentifier = .medium
+        sheet.prefersGrabberVisible = true
+        sheet.prefersEdgeAttachedInCompactHeight = true
+        sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = true
+      }
+      controller.preferredContentSize = CGSize(width: 440, height: 0)
       controller.presentationController?.delegate = self
     }
     host = controller
-    hostIsMainMenu = mainMenu
     parent.present(controller, animated: true)
   }
 
@@ -139,6 +208,32 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     host = nil
     model.screen = ""
     NativeUI.post("dismissed")
+  }
+
+  // MARK: Quick Build overlay
+
+  //! Shows Quick Build's handles and bar with this state, or removes them
+  //! (empty json).
+  func setQuickBuild(json: String) {
+    guard !json.isEmpty,
+      let state = try? JSONDecoder().decode(QuickBuildState.self, from: Data(json.utf8))
+    else {
+      quickBuild?.remove()
+      quickBuild = nil
+      return
+    }
+    if quickBuild == nil, let view = rootViewController()?.view {
+      quickBuild = QuickBuildOverlay(in: view)
+    }
+    quickBuild?.update(state)
+  }
+
+  private func showAlert(json: String) {
+    let info = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
+    let alert = UIAlertController(
+      title: nil, message: info["message"] as? String, preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: "OK", style: .default))
+    topViewController()?.present(alert, animated: true)
   }
 
   // MARK: Toolbar
@@ -351,6 +446,15 @@ struct Level: Codable, Hashable, Identifiable {
   var id: String { levelFile }
 }
 
+struct RoomOption: Codable, Hashable, Identifiable {
+  var id: String
+  var name: String
+  var category: String
+  var cost: String
+  var affordable: Bool
+  var quick: Bool
+}
+
 struct GameSettings: Codable, Hashable {
   var soundVolume: Double = 1
   var announcementVolume: Double = 1
@@ -384,6 +488,7 @@ struct NativeState: Codable {
   var defaultDifficulty: String?
   var canTutorial: Bool?
   var campaigns: [Campaign]?
+  var rooms: [RoomOption]?
   var levels: [Level]?
   var canContinue: Bool?
 }

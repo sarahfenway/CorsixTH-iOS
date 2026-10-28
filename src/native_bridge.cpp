@@ -39,6 +39,7 @@ void cth_native_show(const char* screen, const char* json);
 void cth_native_update(const char* json);
 void cth_native_dismiss();
 void cth_native_set_toolbar(const char* json);
+void cth_native_set_quick_build(const char* json);
 const char* cth_native_screen();
 bool cth_native_tap(const char* label);
 }
@@ -137,6 +138,17 @@ int l_post(lua_State* L) {
   return 0;
 }
 
+// setQuickBuild(json) shows Quick Build's handles and bar, (nil) removes them.
+int l_set_quick_build(lua_State* L) {
+  const char* json = luaL_optstring(L, 1, "");
+#if CTH_NATIVE_UI
+  cth_native_set_quick_build(json);
+#else
+  (void)json;
+#endif
+  return 0;
+}
+
 // Activates the native control with this accessibility label (tests).
 int l_tap(lua_State* L) {
   const char* label = luaL_checkstring(L, 1);
@@ -159,6 +171,7 @@ constexpr luaL_Reg native_lib[] = {{"available", l_available},
                                    {"update", l_update},
                                    {"dismiss", l_dismiss},
                                    {"setToolbar", l_set_toolbar},
+                                   {"setQuickBuild", l_set_quick_build},
                                    {"screen", l_screen},
                                    {"post", l_post},
                                    {"tap", l_tap},
