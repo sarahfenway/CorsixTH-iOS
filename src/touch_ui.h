@@ -26,6 +26,7 @@ SOFTWARE.
 #include <SDL.h>
 
 #include <cstdint>
+#include <vector>
 
 //! Support for running CorsixTH on touch screens (iOS / iPadOS).
 /*!
@@ -75,6 +76,21 @@ void set_controls(const char* name);
 //! off restores the player's own touch controls.
 void set_placement_mode(bool on);
 bool placement_mode_on();
+
+//! A rectangle of the game's screen, in logical pixels.
+struct region {
+  int x;
+  int y;
+  int w;
+  int h;
+};
+
+//! The game's own dialogs on screen (faxes, information boxes, the opening
+//! countdown). With trackpad controls, a touch that starts on one acts where
+//! it lands, as in direct mode, so its buttons can be pressed with a finger;
+//! the cursor then carries on from there. Elsewhere the trackpad is
+//! unchanged.
+void set_direct_regions(std::vector<region> regions);
 
 //! The placement pointer's offset above the finger, in game pixels.
 float placement_offset();

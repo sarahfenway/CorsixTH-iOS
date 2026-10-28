@@ -873,8 +873,34 @@ function NativeUI:updateToolbar(force)
 end
 
 --! Called every game tick (GameUI:onTick).
+-- Game windows that aren't dialogs: touches on them stay trackpad touches.
+local not_dialogs = {
+  UIMenuBar = true, UIBottomPanel = true, UIPlaceStaff = true, Subtitles = true,
+}
+
+--! Tells the touch code where the game's own dialogs are (faxes, information
+--! boxes, the opening countdown), so a finger presses their buttons directly
+--! rather than through the trackpad cursor.
+function NativeUI:updateDirectRegions()
+  local regions, keys = {}, {}
+  for _, window in ipairs(self.app.ui and self.app.ui.windows or {}) do
+    if window.visible ~= false and window.width and window.height
+        and window.x and window.x > editing.OFFSCREEN / 2
+        and not not_dialogs[class.type(window)] then
+      regions[#regions + 1] = { window.x, window.y, window.width, window.height }
+      keys[#keys + 1] = table.concat(regions[#regions], ",")
+    end
+  end
+  local key = table.concat(keys, ";")
+  if key ~= self.direct_regions_key then
+    self.direct_regions_key = key
+    SDL.native.setDirectRegions(regions)
+  end
+end
+
 function NativeUI:onTick()
   self.tick_count = (self.tick_count or 0) + 1
+  self:updateDirectRegions()
   if self.pending_adoptions then
     self:adoptWindows()
   end

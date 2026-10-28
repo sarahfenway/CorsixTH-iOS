@@ -241,6 +241,27 @@ int main() {
            "move(500,240) press1(500,240) release1(500,240) ");
   }
   {
+    // A tap on a dialog clicked where it landed (touch_ui routes it to the
+    // direct recogniser); the trackpad carries on from there, and that tap
+    // doesn't arm a tap-then-drag.
+    auto g = trackpad();
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_up(1, 100, 100, 1100, out);
+    out.clear();
+    g.warp_cursor(300, 200);
+    g.finger_down(1, 100, 100, 1200, out);
+    g.finger_move(1, 105, 100, 1216, out);
+    g.finger_move(1, 110, 105, 1232, out);
+    g.finger_move(1, 115, 105, 1248, out);
+    g.finger_move(1, 120, 110, 1264, out);
+    g.finger_up(1, 120, 110, 1300, out);
+    g.finger_down(1, 100, 100, 2000, out);
+    g.finger_up(1, 100, 100, 2100, out);
+    expect("trackpad: the cursor carries on from where a dialog tap left it", out,
+           "move(310,205) move(315,205) move(321,211) press1(321,211) release1(321,211) ");
+  }
+  {
     auto g = trackpad();
     std::vector<mouse_action> out;
     g.finger_down(1, 100, 100, 1000, out);

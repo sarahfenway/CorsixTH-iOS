@@ -189,6 +189,11 @@ class trackpad_recogniser {
   int cursor_x() const;
   int cursor_y() const;
 
+  //! The game's cursor was moved to (x, y) by something else (a tap on a
+  //! dialog, which clicks where it lands); carry on from there. Call it with
+  //! no fingers down.
+  void warp_cursor(int x, int y);
+
  private:
   enum class state { idle, pending, tracking, dragging, multi };
   struct finger_info {

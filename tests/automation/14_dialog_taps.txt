@@ -1,0 +1,32 @@
+# The game's own dialogs take taps where the finger lands, even with trackpad
+# controls: their buttons are pressed with a finger, not the cursor. Touches
+# on the map stay trackpad touches, carrying on from where the tap was.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+# The level's information box; its close button is in its bottom right corner.
+expect TheApp.ui:getWindow(UIInformation) ~= nil
+lua local w = TheApp.ui:getWindow(UIInformation); rawset(_G, "auto_close", {math.floor(w.x + w.width - 19), math.floor(w.y + w.height - 19)}); return auto_close[1] .. "," .. auto_close[2] .. " cursor " .. TheApp.ui.cursor_x .. "," .. TheApp.ui.cursor_y
+expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_close")[1]) > 40
+tap_at rawget(_G, "auto_close")
+wait 500
+expect TheApp.ui:getWindow(UIInformation) == nil
+expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_close")[1]) <= 2
+# A tap on the map clicks at the cursor, which stays where the dialog tap left it.
+tap 60 60
+wait 500
+expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_close")[1]) <= 2
+# A fax: its choice button is pressed by tapping it.
+lua TheApp.ui.bottom_panel:queueMessage("information", { { text = "Tap the button" }, choices = { { text = "OK", choice = "close" } } })
+wait_until 5000 #corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes == 1
+native_tap Information
+wait_until 3000 TheApp.ui:getWindow(UIFax) ~= nil
+wait 300
+screenshot 1_fax
+lua local f = TheApp.ui:getWindow(UIFax); local b = f.choice_buttons[1]; rawset(_G, "auto_choice", {math.floor(f.x + b.x + 21), math.floor(f.y + b.y + 21)}); return auto_choice[1] .. "," .. auto_choice[2]
+tap_at rawget(_G, "auto_choice")
+wait 800
+expect TheApp.ui:getWindow(UIFax) == nil
+expect #corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes == 0
+screenshot 2_after

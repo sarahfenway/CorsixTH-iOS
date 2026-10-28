@@ -89,6 +89,11 @@ bool trackpad_mode = true;
 bool placement_mode = false;
 bool trackpad_before_placement = true;
 constexpr float placement_offset_points = 40.0f;
+// The game's dialogs: with the trackpad, a gesture that starts on one is
+// handled by the direct recogniser (see set_direct_regions()).
+std::vector<region> direct_regions;
+std::vector<SDL_FingerID> fingers_down;
+bool gesture_direct = false;
 
 std::vector<mouse_action> actions;
 // The game's logical screen size, as last seen on the renderer.
@@ -380,6 +385,19 @@ void window_size(int* width, int* height) {
 // ---------------------------------------------------------------------------
 // SDL glue
 
+namespace {
+
+bool in_direct_region(int x, int y) {
+  for (const region& r : direct_regions) {
+    if (x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 bool handle_event(const SDL_Event& e) {
   if (!enabled()) {
     return false;
@@ -398,7 +416,16 @@ bool handle_event(const SDL_Event& e) {
         return true;
       }
       uint32_t now = SDL_GetTicks();
-      if (trackpad_mode) {
+      if (e.type == SDL_FINGERDOWN) {
+        if (fingers_down.empty()) {
+          gesture_direct = trackpad_mode && in_direct_region(x, y);
+        }
+        fingers_down.push_back(f.fingerId);
+      } else if (e.type == SDL_FINGERUP) {
+        fingers_down.erase(std::remove(fingers_down.begin(), fingers_down.end(), f.fingerId),
+                           fingers_down.end());
+      }
+      if (trackpad_mode && !gesture_direct) {
         trackpad.set_bounds(logical_w, logical_h);
         if (e.type == SDL_FINGERDOWN) {
           trackpad.finger_down(f.fingerId, x, y, now, actions);
@@ -417,6 +444,11 @@ bool handle_event(const SDL_Event& e) {
         }
       }
       flush_actions();
+      if (gesture_direct && fingers_down.empty()) {
+        // Back to the trackpad, from where this gesture left the cursor.
+        gesture_direct = false;
+        trackpad.warp_cursor(cursor_x, cursor_y);
+      }
       return true;
     }
     case SDL_MULTIGESTURE:
@@ -424,6 +456,8 @@ bool handle_event(const SDL_Event& e) {
     case SDL_APP_WILLENTERBACKGROUND:
       direct.cancel(actions);
       trackpad.cancel(actions);
+      fingers_down.clear();
+      gesture_direct = false;
       flush_actions();
       return false;
     default:
@@ -435,7 +469,7 @@ void poll() {
   if (!enabled()) {
     return;
   }
-  if (!trackpad_mode) {
+  if (!trackpad_mode || gesture_direct) {
     direct.tick(SDL_GetTicks(), actions);  // long press
   }
   flush_actions();
@@ -459,6 +493,10 @@ void set_placement_mode(bool on) {
 }
 
 bool placement_mode_on() { return placement_mode; }
+
+void set_direct_regions(std::vector<region> regions) {
+  direct_regions = std::move(regions);
+}
 
 float placement_offset() {
   // The window may not be known yet; then there's no offset to speak of.

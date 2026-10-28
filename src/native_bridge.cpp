@@ -25,6 +25,7 @@ SOFTWARE.
 #include <png.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -299,6 +300,27 @@ int l_set_placement_touch(lua_State* L) {
   return 0;
 }
 
+// setDirectRegions({{x, y, w, h}, ...}): the game's dialogs on screen, in
+// game pixels; with the trackpad, touches on them act where they land.
+int l_set_direct_regions(lua_State* L) {
+  luaL_checktype(L, 1, LUA_TTABLE);
+  std::vector<touch_ui::region> regions;
+  lua_Integer n = luaL_len(L, 1);
+  for (lua_Integer i = 1; i <= n; ++i) {
+    lua_geti(L, 1, i);
+    int v[4] = {0, 0, 0, 0};
+    for (int k = 0; k < 4; ++k) {
+      lua_geti(L, -1, k + 1);
+      v[k] = static_cast<int>(std::lround(lua_tonumber(L, -1)));  // may be fractional
+      lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    regions.push_back({v[0], v[1], v[2], v[3]});
+  }
+  touch_ui::set_direct_regions(std::move(regions));
+  return 0;
+}
+
 // placementOffset(): how far above the finger the pointer is, in game pixels.
 int l_placement_offset(lua_State* L) {
   lua_pushnumber(L, touch_ui::placement_offset());
@@ -323,6 +345,7 @@ constexpr luaL_Reg native_lib[] = {{"available", l_available},
                                    {"renderToPNG", l_render_to_png},
                                    {"setPlacementTouch", l_set_placement_touch},
                                    {"placementOffset", l_placement_offset},
+                                   {"setDirectRegions", l_set_direct_regions},
                                    {"setCursorSpeed", l_set_cursor_speed},
                                    {nullptr, nullptr}};
 

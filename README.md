@@ -86,6 +86,7 @@ finger moves, rather than jumping to where you touch:
 |---|---|
 | Slide one finger | Moves the cursor. Faster flicks move it further. |
 | Tap | Left click where the cursor is |
+| Tap on a game dialog (fax, information box) | Presses what's under your finger; the cursor carries on from there |
 | Tap, then touch again and move | Left-button drag, for sizing rooms, scroll bars and moving windows |
 | Two-finger tap | Right click where the cursor is |
 | Two-finger drag | Moves the map; the cursor stays put |

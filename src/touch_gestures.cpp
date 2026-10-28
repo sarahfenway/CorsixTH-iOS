@@ -341,6 +341,18 @@ int trackpad_recogniser::cursor_y() const {
   return static_cast<int>(std::lround(cy));
 }
 
+void trackpad_recogniser::warp_cursor(int x, int y) {
+  cx = x;
+  cy = y;
+  if (bounds_w > 0 && bounds_h > 0) {
+    cx = std::clamp(cx, 0.0, static_cast<double>(bounds_w - 1));
+    cy = std::clamp(cy, 0.0, static_cast<double>(bounds_h - 1));
+  }
+  cursor_announced = true;
+  last_was_tap = false;
+  drag_armed = false;
+}
+
 trackpad_recogniser::finger_info* trackpad_recogniser::find(int64_t id) {
   for (finger_info& f : fingers) {
     if (f.id == id) {
