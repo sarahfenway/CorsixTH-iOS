@@ -59,7 +59,10 @@ uint32_t window_flags();
 void window_size(int* width, int* height);
 
 //! Handles an SDL touch event, pushing synthesised mouse events onto the SDL
-//! event queue. Returns true if the event was consumed.
+//! event queue. Returns true if the event was consumed. On touch screens it
+//! also consumes SDL's own SDL_MULTIGESTURE events: they count every wobble of
+//! two panning fingers as a pinch, so touch_ui sends its own instead, only for
+//! a real pinch.
 bool handle_event(const SDL_Event& e);
 
 //! Chooses how touches work: "trackpad" (the default: the screen moves the

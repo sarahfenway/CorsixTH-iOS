@@ -38,11 +38,34 @@ struct mouse_action {
   //! move: pointer to (x, y). press/release: button at (x, y).
   //! pan: drag the map by (x, y) with the middle button held, without moving
   //! the pointer.
-  enum class kind { move, press, release, pan };
+  //! zoom: the fingers' spacing changed by `distance` (positive = apart)
+  //! around their centre (x, y).
+  enum class kind { move, press, release, pan, zoom };
   kind type;
   int button;  // button_left / button_middle / button_right; unused otherwise
   int x;
   int y;
+  int distance = 0;  // zoom only
+};
+
+//! Decides when two fingers are pinching rather than just panning: real
+//! fingers drift a little closer or further apart as they pan, so a pinch only
+//! starts once their spacing has changed by more than a threshold since they
+//! went down. After that every change counts.
+class pinch_tracker {
+ public:
+  explicit pinch_tracker(int threshold) : threshold(threshold) {}
+  //! A new two-finger gesture (or the fingers changed), `separation` apart.
+  void begin(double separation);
+  //! The fingers are now `separation` apart. Returns how much to zoom by (in
+  //! pixels of spacing), 0 while still within the threshold.
+  int update(double separation);
+
+ private:
+  int threshold;
+  double start{0};
+  double last{0};
+  bool pinching{false};
 };
 
 //! Turns touches into the mouse actions Theme Hospital expects.
@@ -54,7 +77,8 @@ struct mouse_action {
     - long press                   -> right click
     - two-finger tap               -> right click
     - two-finger drag              -> middle button drag (pans the map)
-    - pinch                        -> left to SDL_MULTIGESTURE (zoom)
+    - pinch                        -> zoom, once the spacing has changed by
+                                      more than pinch_threshold
 
     The class is pure logic so it can be unit tested without SDL windows.
 */
@@ -65,6 +89,7 @@ class gesture_recogniser {
     uint32_t long_press_ms = 500;
     uint32_t two_finger_tap_ms = 350;
     int move_threshold = 12;  // logical pixels
+    int pinch_threshold = 28;  // logical pixels of change in finger spacing
   };
 
   gesture_recogniser() = default;
@@ -94,11 +119,13 @@ class gesture_recogniser {
   finger_info* find(int64_t id);
   void remove(int64_t id);
   void centroid(int* x, int* y) const;
+  double separation() const;
   bool moved_far(int x0, int y0, int x1, int y1) const;
 
   settings cfg{};
   state st{state::idle};
   std::vector<finger_info> fingers;
+  pinch_tracker pinch{cfg.pinch_threshold};
   int64_t primary{0};
   int origin_x{0};
   int origin_y{0};
@@ -119,7 +146,8 @@ class gesture_recogniser {
     - tap, then touch again and move -> left button drag (as on a laptop)
     - two-finger tap                -> right click at the cursor
     - two-finger drag               -> pans the map; the cursor stays put
-    - pinch                         -> left to SDL_MULTIGESTURE (zoom)
+    - pinch                         -> zoom, once the spacing has changed by
+                                       more than pinch_threshold
 */
 class trackpad_recogniser {
  public:
@@ -128,6 +156,7 @@ class trackpad_recogniser {
     uint32_t double_tap_ms = 350;      // tap-then-drag: gap allowed after the tap
     uint32_t two_finger_tap_ms = 300;  // longest two-finger tap
     int move_threshold = 8;            // logical pixels before a touch moves
+    int pinch_threshold = 28;          // change in finger spacing before zooming
     double speed = 1.0;                // cursor speed multiplier
   };
 
@@ -165,6 +194,7 @@ class trackpad_recogniser {
   finger_info* find(int64_t id);
   void remove(int64_t id);
   void centroid(int* x, int* y) const;
+  double separation() const;
   bool moved_far(int x0, int y0, int x1, int y1) const;
   void move_cursor(double dx, double dy, std::vector<mouse_action>& out);
   void click(int button, std::vector<mouse_action>& out);
@@ -172,6 +202,7 @@ class trackpad_recogniser {
   settings cfg{};
   state st{state::idle};
   std::vector<finger_info> fingers;
+  pinch_tracker pinch{cfg.pinch_threshold};
   int64_t primary{0};
   uint32_t down_time{0};
   uint32_t last_move_time{0};

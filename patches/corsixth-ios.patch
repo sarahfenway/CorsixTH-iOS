@@ -289,7 +289,7 @@ index a571816..1b804c9 100644
    self.visible = true
    if not self.on_top then
 diff --git a/CorsixTH/Lua/game_ui.lua b/CorsixTH/Lua/game_ui.lua
-index ef575f9..40900d1 100644
+index ef575f9..885e5a8 100644
 --- a/CorsixTH/Lua/game_ui.lua
 +++ b/CorsixTH/Lua/game_ui.lua
 @@ -590,8 +590,11 @@ function GameUI:onMouseMove(x, y, dx, dy)
@@ -306,7 +306,7 @@ index ef575f9..40900d1 100644
      self:scrollMap(momentum_x_int, momentum_y_int)
  
      self.current_momentum.x = self.current_momentum.x - momentum_x_int
-@@ -751,7 +754,19 @@ end
+@@ -751,7 +754,22 @@ end
  --!return (boolean) event processed indicator
  function GameUI:onMultiGesture(numfingers, dTheta, dDist, x, y)
    -- only deal with 2 finger events for now
@@ -316,6 +316,9 @@ index ef575f9..40900d1 100644
 +    -- smaller, on 120 Hz screens), so add them up instead of ignoring each
 +    -- small one. Panning arrives separately, as a middle button drag.
 +    self.pinch_distance = (self.pinch_distance or 0) + dDist
++    -- Zoom around the fingers (see GameUI:zoomByMomentum).
++    self.pinch_centre_x = x * self.app.config.width
++    self.pinch_centre_y = y * self.app.config.height
 +    if math.abs(self.pinch_distance) > multigesture_pinch_sensitivity_factor then
 +      self.current_momentum.z = self.current_momentum.z +
 +          self.pinch_distance * multigesture_pinch_amplification_factor
@@ -327,7 +330,32 @@ index ef575f9..40900d1 100644
      -- calculate magnitude of pinch
      local mag = math.abs(dDist)
      if mag > multigesture_pinch_sensitivity_factor then
-@@ -857,6 +872,14 @@ function GameUI:onTick()
+@@ -837,6 +855,19 @@ function GameUI:_isMouseScrollButtonDown()
+   return mouse_scroll_button_down
+ end
+ 
++--! Applies zoom momentum. The game zooms around the cursor; on touch screens
++-- a pinch zooms around the fingers instead, where the cursor may not be.
++function GameUI:zoomByMomentum()
++  if not (self.app.touch_ui and self.pinch_centre_x) then
++    return self.app.world:adjustZoom(self.current_momentum.z)
++  end
++  local cursor_x, cursor_y = self.cursor_x, self.cursor_y
++  self.cursor_x, self.cursor_y = self.pinch_centre_x, self.pinch_centre_y
++  local zoomed = self.app.world:adjustZoom(self.current_momentum.z)
++  self.cursor_x, self.cursor_y = cursor_x, cursor_y
++  return zoomed
++end
++
+ function GameUI:onTick()
+   local repaint = UI.onTick(self)
+   if not self:_isMouseScrollButtonDown() then
+@@ -853,10 +884,18 @@ function GameUI:onTick()
+       self.current_momentum.z = 0.0
+     else
+       self.current_momentum.z = self.current_momentum.z * self.momentum
+-      self.app.world:adjustZoom(self.current_momentum.z)
++      self:zoomByMomentum()
      end
      self.multigesturemove.x = 0.0
      self.multigesturemove.y = 0.0
@@ -337,12 +365,12 @@ index ef575f9..40900d1 100644
 +      self.current_momentum.z = 0.0
 +    else
 +      self.current_momentum.z = self.current_momentum.z * self.momentum
-+      self.app.world:adjustZoom(self.current_momentum.z)
++      self:zoomByMomentum()
 +    end
    end
    if self.tick_scroll_amount or self.tick_scroll_amount_mouse then
      -- The scroll amount per tick gradually increases as the duration of the
-@@ -910,6 +933,11 @@ function GameUI:onTick()
+@@ -910,6 +949,11 @@ function GameUI:onTick()
  
    self.announcer:onTick()
  
@@ -414,7 +442,7 @@ index 304a15e..13cc2fe 100644
    if self.button.toggled ~= active then
      self.button:toggle()
 diff --git a/CorsixTH/Src/sdl_core.cpp b/CorsixTH/Src/sdl_core.cpp
-index 13c349a..f154658 100644
+index 13c349a..5e77b72 100644
 --- a/CorsixTH/Src/sdl_core.cpp
 +++ b/CorsixTH/Src/sdl_core.cpp
 @@ -36,6 +36,9 @@ SOFTWARE.
@@ -445,7 +473,7 @@ index 13c349a..f154658 100644
  
    while ((wait_error = SDL_WaitEvent(&e)) != 0) {
      bool do_frame = false;
-@@ -354,6 +361,27 @@ void mainloop(lua_State* L) {
+@@ -354,7 +361,32 @@ void mainloop(lua_State* L) {
            lua_pushinteger(L, e.motion.yrel);
            nargs = 5;
            break;
@@ -471,9 +499,14 @@ index 13c349a..f154658 100644
 +          nargs = 0;
 +          break;
          case SDL_MULTIGESTURE:
++          if (touch_ui::handle_event(e)) {
++            nargs = 0;  // Touch screens: touch_ui sends its own pinches.
++            break;
++          }
            last_dispatch = dispatch_multigesture;
            push_app_dispatch(L, last_dispatch);
-@@ -408,6 +436,7 @@ void mainloop(lua_State* L) {
+           lua_pushinteger(L, e.mgesture.numFingers);
+@@ -408,6 +440,7 @@ void mainloop(lua_State* L) {
            nargs = 0;
            break;
          case SDL_USEREVENT_TICK:
@@ -481,7 +514,7 @@ index 13c349a..f154658 100644
            do_timer = true;
            nargs = 0;
            break;
-@@ -424,6 +453,12 @@ void mainloop(lua_State* L) {
+@@ -424,6 +457,12 @@ void mainloop(lua_State* L) {
            break;
          default:
            nargs = 0;
@@ -494,7 +527,7 @@ index 13c349a..f154658 100644
            break;
        }
        if (nargs != 0) {
-@@ -447,8 +482,12 @@ void mainloop(lua_State* L) {
+@@ -447,8 +486,12 @@ void mainloop(lua_State* L) {
        }
        do_frame = do_frame || (lua_toboolean(L, -1) != 0);
        lua_pop(L, 2);
@@ -508,7 +541,7 @@ index 13c349a..f154658 100644
        last_dispatch = dispatch_frame;
        do {
          if (fps.track_fps) {
-@@ -485,6 +524,7 @@ int luaopen_sdl(lua_State* L) {
+@@ -485,6 +528,7 @@ int luaopen_sdl(lua_State* L) {
    luaT_register(L, "sdl", sdllib);
    load_extra(L, "audio", luaopen_sdl_audio);
    load_extra(L, "wm", luaopen_sdl_wm);

@@ -26,6 +26,7 @@ SOFTWARE.
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -348,7 +349,9 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
     add_two_finger_gesture({c.x - half, c.y}, {c.x + half, c.y},
                            {c.x - end, c.y}, {c.x + end, c.y}, now, 400);
   } else if (command == "pan") {
-    if (!parse_numbers(rest, 2, &n)) return bad("pan <dx> <dy>");
+    if (!parse_numbers(rest, 2, &n) && !parse_numbers(rest, 3, &n)) {
+      return bad("pan <dx> <dy> [wobble]");
+    }
     // Pan around the middle of the screen; only the distance matters.
     SDL_Window* window = game_window();
     int ww = 0;
@@ -363,8 +366,30 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
     point c{ww / 2.0f - dx / 2, wh / 2.0f - dy / 2};
     point a1{c.x - 30, c.y};
     point a2{c.x + 30, c.y};
-    add_two_finger_gesture(a1, a2, {a1.x + dx, a1.y + dy},
-                           {a2.x + dx, a2.y + dy}, now, 400);
+    if (n.size() < 3) {
+      add_two_finger_gesture(a1, a2, {a1.x + dx, a1.y + dy},
+                             {a2.x + dx, a2.y + dy}, now, 400);
+    } else {
+      // As real fingers pan: their spacing drifts by up to `wobble` points.
+      float wobble = static_cast<float>(n[2]);
+      SDL_FingerID f1 = s.next_finger++;
+      SDL_FingerID f2 = s.next_finger++;
+      add_finger(SDL_FINGERDOWN, f1, a1, now);
+      add_finger(SDL_FINGERDOWN, f2, a2, now + 10);
+      constexpr int steps = 50;
+      point b1 = a1;
+      point b2 = a2;
+      for (int i = 1; i <= steps; ++i) {
+        float t = static_cast<float>(i) / steps;
+        float drift = wobble * std::sin(t * 6.2832f * 3);
+        b1 = {a1.x + dx * t, a1.y + dy * t};
+        b2 = {a2.x + dx * t + drift, a2.y + dy * t};
+        add_finger(SDL_FINGERMOTION, f1, b1, now + 30 + 8 * i);
+        add_finger(SDL_FINGERMOTION, f2, b2, now + 34 + 8 * i);
+      }
+      add_finger(SDL_FINGERUP, f1, b1, now + 50 + 8 * steps);
+      add_finger(SDL_FINGERUP, f2, b2, now + 60 + 8 * steps);
+    }
   } else if (command == "type") {
     // Text arrives in chunks that fit an SDL text event (nul-terminated).
     constexpr size_t chunk_size = SDL_TEXTINPUTEVENT_TEXT_SIZE - 1;

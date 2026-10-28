@@ -27,8 +27,12 @@ std::string describe(const std::vector<mouse_action>& v) {
     const char* name = a.type == kind::move    ? "move"
                        : a.type == kind::press ? "press"
                        : a.type == kind::pan   ? "pan"
+                       : a.type == kind::zoom  ? "zoom"
                                                : "release";
-    if (a.type == kind::move || a.type == kind::pan) {
+    if (a.type == kind::zoom) {
+      std::snprintf(buf, sizeof(buf), "%s%+d(%d,%d) ", name, a.distance, a.x,
+                    a.y);
+    } else if (a.type == kind::move || a.type == kind::pan) {
       std::snprintf(buf, sizeof(buf), "%s(%d,%d) ", name, a.x, a.y);
     } else {
       std::snprintf(buf, sizeof(buf), "%s%d(%d,%d) ", name, a.button, a.x,
@@ -136,8 +140,12 @@ int main() {
     }
     g.finger_up(1, 40, 100, 1300, out);
     g.finger_up(2, 260, 100, 1310, out);
-    expect("pinch alone produces no clicks (zoom comes from SDL)", out,
-           "move(100,100) ");
+    expect("pinch zooms once the fingers' spacing has changed enough, "
+           "no clicks", out,
+           // (The fingers move one at a time, so the centre steps between them.)
+           "move(100,100) " "zoom+10(150,100) zoom+10(145,100) zoom+10(150,100) "
+           "zoom+10(145,100) zoom+10(150,100) zoom+10(145,100) "
+           "zoom+10(150,100) zoom+10(145,100) zoom+10(150,100) ");
   }
   {
     gesture_recogniser g;
@@ -337,8 +345,11 @@ int main() {
     }
     g.finger_up(1, 40, 100, 1300, out);
     g.finger_up(2, 260, 100, 1310, out);
-    expect("trackpad: pinch alone gives no clicks or pans", out,
-           "move(500,240) ");
+    expect("trackpad: pinch zooms once the spacing has changed enough, "
+           "no clicks or pans", out,
+           "move(500,240) " "zoom+10(150,100) zoom+10(145,100) zoom+10(150,100) "
+           "zoom+10(145,100) zoom+10(150,100) zoom+10(145,100) "
+           "zoom+10(150,100) zoom+10(145,100) zoom+10(150,100) ");
   }
   {
     auto g = trackpad();
@@ -391,6 +402,45 @@ int main() {
     } else {
       ++failures;
       std::printf("FAIL trackpad: unpaired buttons or cursor off screen\n");
+    }
+  }
+
+  // A two-finger pan where the fingers drift a little closer and further
+  // apart (as real fingers do) must not zoom, and must still pan.
+  {
+    auto wobbly_pan = [](auto& g, std::vector<mouse_action>& out) {
+      g.finger_down(1, 100, 200, 1000, out);
+      g.finger_down(2, 160, 200, 1020, out);
+      for (int i = 1; i <= 40; ++i) {
+        int wobble = (i % 8 < 4 ? i % 4 : 4 - i % 4) * 5;  // 0..20 px
+        g.finger_move(1, 100 + 5 * i, 200 + 2 * i, 1020 + 8 * i, out);
+        g.finger_move(2, 160 + 5 * i + wobble, 200 + 2 * i, 1024 + 8 * i, out);
+      }
+      g.finger_up(1, 300, 280, 1400, out);
+      g.finger_up(2, 360, 280, 1410, out);
+    };
+    auto count = [](const std::vector<mouse_action>& out, kind k) {
+      int n = 0;
+      for (const auto& a : out) n += a.type == k;
+      return n;
+    };
+    {
+      gesture_recogniser g;
+      std::vector<mouse_action> out;
+      wobbly_pan(g, out);
+      bool ok = count(out, kind::zoom) == 0 && count(out, kind::press) == 1;
+      std::printf("%s direct: a wobbly two-finger pan pans without zooming "
+                  "(%d zooms)\n", ok ? "ok  " : "FAIL", count(out, kind::zoom));
+      failures += ok ? 0 : 1;
+    }
+    {
+      auto g = trackpad();
+      std::vector<mouse_action> out;
+      wobbly_pan(g, out);
+      bool ok = count(out, kind::zoom) == 0 && count(out, kind::pan) > 0;
+      std::printf("%s trackpad: a wobbly two-finger pan pans without zooming "
+                  "(%d zooms)\n", ok ? "ok  " : "FAIL", count(out, kind::zoom));
+      failures += ok ? 0 : 1;
     }
   }
 

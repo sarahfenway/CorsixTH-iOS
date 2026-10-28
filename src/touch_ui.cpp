@@ -140,6 +140,9 @@ bool finger_to_logical(const SDL_TouchFingerEvent& f, int* x, int* y) {
   return true;
 }
 
+// Marks the SDL_MULTIGESTURE events touch_ui makes (SDL's own are dropped).
+constexpr SDL_TouchID own_gesture_touch_id = -0x7475;
+
 uint32_t button_mask(int button) {
   return SDL_BUTTON(static_cast<uint32_t>(button));
 }
@@ -173,6 +176,23 @@ void flush_actions() {
         ev.motion.y = cursor_y;
         ev.motion.xrel = a.x;
         ev.motion.yrel = a.y;
+        SDL_PushEvent(&ev);
+        continue;
+      case mouse_action::kind::zoom:
+        // A pinch, as SDL describes one: the change in the fingers' mean
+        // distance from their centre, and the centre, both as fractions of
+        // the screen.
+        if (logical_w <= 0 || logical_h <= 0) {
+          continue;
+        }
+        ev.type = SDL_MULTIGESTURE;
+        ev.mgesture.timestamp = SDL_GetTicks();
+        ev.mgesture.touchId = own_gesture_touch_id;
+        ev.mgesture.numFingers = 2;
+        ev.mgesture.dTheta = 0;
+        ev.mgesture.dDist = static_cast<float>(a.distance) / (2.0f * logical_w);
+        ev.mgesture.x = static_cast<float>(a.x) / logical_w;
+        ev.mgesture.y = static_cast<float>(a.y) / logical_h;
         SDL_PushEvent(&ev);
         continue;
       case mouse_action::kind::press:
@@ -401,6 +421,8 @@ bool handle_event(const SDL_Event& e) {
       flush_actions();
       return true;
     }
+    case SDL_MULTIGESTURE:
+      return e.mgesture.touchId != own_gesture_touch_id;
     case SDL_APP_WILLENTERBACKGROUND:
       direct.cancel(actions);
       trackpad.cancel(actions);

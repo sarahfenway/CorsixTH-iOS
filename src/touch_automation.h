@@ -42,7 +42,9 @@ struct lua_State;
       drag <x1> <y1> <x2> <y2> <ms>     one finger
       twofinger_tap <x> <y>
       pinch <x> <y> <scale>             two fingers moving apart (scale > 1)
-      pan <dx> <dy>                     two fingers moving together
+      pan <dx> <dy> [wobble]            two fingers moving together (their
+                                        spacing drifting by up to wobble
+                                        points, as real fingers' does)
       coords game|points                what tap/drag/... coordinates mean:
                                         game pixels (the default) or screen
                                         points

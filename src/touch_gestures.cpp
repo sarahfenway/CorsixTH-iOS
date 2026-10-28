@@ -27,6 +27,49 @@ SOFTWARE.
 
 namespace touch_ui {
 
+namespace {
+
+// Distance between the first two fingers.
+template <typename Finger>
+double finger_separation(const std::vector<Finger>& fingers) {
+  if (fingers.size() < 2) {
+    return 0;
+  }
+  double dx = fingers[1].x - fingers[0].x;
+  double dy = fingers[1].y - fingers[0].y;
+  return std::sqrt(dx * dx + dy * dy);
+}
+
+}  // namespace
+
+void pinch_tracker::begin(double separation) {
+  start = separation;
+  last = separation;
+  pinching = false;
+}
+
+int pinch_tracker::update(double separation) {
+  if (!pinching) {
+    if (std::abs(separation - start) <= threshold) {
+      return 0;
+    }
+    pinching = true;  // Zoom from here on, without a jump.
+    last = separation;
+    return 0;
+  }
+  int change = static_cast<int>(std::lround(separation - last));
+  last += change;
+  return change;
+}
+
+double gesture_recogniser::separation() const {
+  return finger_separation(fingers);
+}
+
+double trackpad_recogniser::separation() const {
+  return finger_separation(fingers);
+}
+
 // ---------------------------------------------------------------------------
 // gesture_recogniser
 
@@ -93,6 +136,7 @@ void gesture_recogniser::finger_down(int64_t finger, int x, int y,
     if (!panning) {
       centroid(&pan_start_x, &pan_start_y);
     }
+    pinch.begin(separation());
     return;
   }
   if (st == state::dragging) {
@@ -107,6 +151,7 @@ void gesture_recogniser::finger_down(int64_t finger, int x, int y,
   centroid(&pan_start_x, &pan_start_y);
   tap_x = pan_start_x;
   tap_y = pan_start_y;
+  pinch.begin(separation());
 }
 
 void gesture_recogniser::finger_move(int64_t finger, int x, int y,
@@ -137,6 +182,9 @@ void gesture_recogniser::finger_move(int64_t finger, int x, int y,
     }
     if (panning) {
       out.push_back({mouse_action::kind::move, 0, cx, cy});
+    }
+    if (int change = pinch.update(separation())) {
+      out.push_back({mouse_action::kind::zoom, 0, cx, cy, change});
     }
     return;
   }
@@ -187,8 +235,9 @@ void gesture_recogniser::finger_up(int64_t finger, int x, int y, uint32_t now,
       panning = false;
     }
     remove(finger);
-    // If fingers remain, a later pan starts from where they are now.
+    // If fingers remain, a later pan or pinch starts from where they are now.
     centroid(&pan_start_x, &pan_start_y);
+    pinch.begin(separation());
     if (fingers.empty()) {
       if (tap_possible && now - down_time <= cfg.two_finger_tap_ms) {
         out.push_back({mouse_action::kind::move, 0, tap_x, tap_y});
@@ -365,6 +414,7 @@ void trackpad_recogniser::finger_down(int64_t finger, int x, int y,
     if (!panning) {
       centroid(&pan_x, &pan_y);
     }
+    pinch.begin(separation());
     return;
   }
   if (st == state::dragging) {
@@ -376,6 +426,7 @@ void trackpad_recogniser::finger_down(int64_t finger, int x, int y,
   panning = false;
   last_was_tap = false;
   centroid(&pan_x, &pan_y);
+  pinch.begin(separation());
 }
 
 void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
@@ -409,6 +460,9 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
       out.push_back({mouse_action::kind::pan, 0, mx - pan_x, my - pan_y});
       pan_x = mx;
       pan_y = my;
+    }
+    if (int change = pinch.update(separation())) {
+      out.push_back({mouse_action::kind::zoom, 0, mx, my, change});
     }
     return;
   }
@@ -466,7 +520,8 @@ void trackpad_recogniser::finger_up(int64_t finger, int x, int y,
       panning = false;
     }
     remove(finger);
-    centroid(&pan_x, &pan_y);  // A later pan starts from here.
+    centroid(&pan_x, &pan_y);  // A later pan or pinch starts from here.
+    pinch.begin(separation());
     if (fingers.empty()) {
       if (tap_possible && now - down_time <= cfg.two_finger_tap_ms) {
         click(button_right, out);

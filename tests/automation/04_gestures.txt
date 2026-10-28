@@ -11,6 +11,14 @@ lua TheApp.ui.screen_offset_x
 expect math.abs(TheApp.ui.screen_offset_x - rawget(_G, "auto_x")) > 75
 screenshot 1_panned
 expect TheApp.ui.zoom_factor == 1
+# Real fingers drift closer and further apart while panning: that's a pan,
+# not a pinch, so the zoom stays put and the map moves by the pan.
+lua rawset(_G, "auto_x", TheApp.ui.screen_offset_x); return auto_x
+pan 150 0 15
+wait 1000
+lua return TheApp.ui.zoom_factor .. " moved " .. (TheApp.ui.screen_offset_x - rawget(_G, "auto_x"))
+expect TheApp.ui.zoom_factor == 1
+expect math.abs(TheApp.ui.screen_offset_x - rawget(_G, "auto_x") + 150) < 20
 pinch 349 240 3
 wait 1500
 lua TheApp.ui.zoom_factor
@@ -22,6 +30,14 @@ wait 1500
 lua TheApp.ui.zoom_factor
 expect TheApp.ui.zoom_factor < rawget(_G, "auto_zoom") - 0.5
 screenshot 3_zoomed_out
+# A pinch zooms around the fingers, wherever the cursor is: the spot between
+# them stays under them.
+lua rawset(_G, "auto_cursor", {TheApp.ui.cursor_x, TheApp.ui.cursor_y}); TheApp.ui.cursor_x, TheApp.ui.cursor_y = 600, 400; local wx, wy = TheApp.ui:ScreenToWorld(200, 150); rawset(_G, "auto_spot", {wx, wy}); return wx .. "," .. wy
+pinch 200 150 2
+wait 1500
+lua local sx, sy = TheApp.ui:WorldToScreen(rawget(_G, "auto_spot")[1], rawget(_G, "auto_spot")[2]); rawset(_G, "auto_drift", math.max(math.abs(sx - 200), math.abs(sy - 150))); return ("now at %.0f,%.0f, zoom %.2f"):format(sx, sy, TheApp.ui.zoom_factor)
+expect rawget(_G, "auto_drift") < 12
+lua TheApp.ui.cursor_x, TheApp.ui.cursor_y = rawget(_G, "auto_cursor")[1], rawget(_G, "auto_cursor")[2]
 # Trackpad mode: the cursor moves by the finger's movement.
 controls trackpad
 lua rawset(_G, "auto_cx", TheApp.ui.cursor_x); return auto_cx
