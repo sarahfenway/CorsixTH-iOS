@@ -168,6 +168,12 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
         // A panel beside the map, which stays in play. (The game is always
         // landscape, so this is every phone and iPad; iOS only offers full
         // height sheets in landscape on phones.)
+        // The panel sits clear of the screen edges, so the screen's safe
+        // area (notch, Dynamic Island) doesn't apply inside it.
+        if #available(iOS 16.4, *) {
+          controller.safeAreaRegions = []
+        }
+        model.inPanel = true
         root.addChild(controller)
         let view = controller.view!
         view.translatesAutoresizingMaskIntoConstraints = false
@@ -184,10 +190,12 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
         ])
         controller.didMove(toParent: root)
         panel = controller
+
         return
       }
       // Narrow windows (e.g. iPad split view): a half-height sheet; the map
       // above stays usable.
+      model.inPanel = false
       controller.modalPresentationStyle = .pageSheet
       if let sheet = controller.sheetPresentationController {
         sheet.detents = [.medium(), .large()]
@@ -394,6 +402,8 @@ final class NativeModel: ObservableObject {
   @Published var alertMessage: String?
   //! Changes whenever Lua shows a screen, to start its navigation afresh.
   @Published var navigationID = UUID()
+  //! The screen is in a side panel rather than a sheet.
+  @Published var inPanel = false
   private var raw: [String: Any] = [:]
 
   func apply(json: String, replace: Bool) {
@@ -453,6 +463,7 @@ struct RoomOption: Codable, Hashable, Identifiable {
   var cost: String
   var affordable: Bool
   var quick: Bool
+  var image: String?
 }
 
 struct GameSettings: Codable, Hashable {

@@ -44,7 +44,8 @@ namespace native_bridge {
 //! dismiss(), setToolbar(json or nil), setQuickBuild(json or nil),
 //! post(action, json) (for tests),
 //! screen() (the screen showing, or nil), tap(label) (tests: activates a
-//! native control by its accessibility label) and setCursorSpeed(multiplier).
+//! native control by its accessibility label), setCursorSpeed(multiplier) and
+//! renderToPNG(path, w, h, draw) (the game's art as pictures for native menus).
 int luaopen(lua_State* L);
 
 //! True if e is an action from the native UI.

@@ -28,6 +28,7 @@ SOFTWARE. --]]
 local json = corsixth.require("ios.json")
 local QuickBuild = corsixth.require("ios.quick_build")
 local SDL = require("sdl")
+local TH = require("TH")
 local pathsep = package.config:sub(1, 1)
 
 local NativeUI = {}
@@ -362,6 +363,42 @@ function NativeUI:findCampaigns()
   return campaigns
 end
 
+--! Folder for pictures of the game's art made for native menus. They come
+-- from the player's own Theme Hospital data, so they're made on the device
+-- (once) rather than shipped.
+function NativeUI:pictureDir()
+  if not self.picture_dir then
+    local caches = (os.getenv("HOME") or ".") .. "/Library/Caches"
+    lfs.mkdir(caches)
+    self.picture_dir = caches .. "/CorsixTH/"
+    lfs.mkdir(self.picture_dir)
+  end
+  return self.picture_dir
+end
+
+--! A picture of the room, as Theme Hospital's Build Room window previews it.
+-- Returns the PNG's path, or nil.
+function NativeUI:roomPicture(room)
+  local anim_id = room.build_preview_animation
+  if not anim_id then
+    return nil
+  end
+  local path = self:pictureDir() .. ("room_%s_v2.png"):format(room.id)
+  if not lfs.attributes(path, "size") then
+    local anim = TH.animation()
+    anim:setAnimation(self.app.anims, anim_id)
+    -- The same frame and anchor as the preview box in UIBuildRoom.
+    local ok, err = SDL.native.renderToPNG(path, 140, 124, function()
+      anim:draw(self.app.video, 70, 54)
+    end)
+    if not ok then
+      print("Native UI: couldn't make a picture of " .. room.id .. ": " .. tostring(err))
+      return nil
+    end
+  end
+  return path
+end
+
 --! The rooms the player can build now, as UIBuildRoom lists them.
 function NativeUI:roomList()
   local app = self.app
@@ -384,6 +421,7 @@ function NativeUI:roomList()
             cost = NativeUI.formatMoney(cost),
             affordable = world.free_build_mode or hospital.balance >= cost,
             quick = quick_build_rooms[room.id] or false,
+            image = self:roomPicture(room),
           }
           break
         end

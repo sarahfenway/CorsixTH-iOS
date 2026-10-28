@@ -22,7 +22,24 @@ struct NativeRootView: View {
       case "settings":
         NavigationStack { SettingsView().toolbar { DoneButton() } }
       case "room_catalog":
-        NavigationStack { RoomCatalogView().toolbar { DoneButton() } }
+        if model.inPanel {
+          // No navigation container in the panel: it would pad for the
+          // screen's safe area, which the panel doesn't touch.
+          VStack(spacing: 0) {
+            HStack {
+              Text("Build Room").font(.headline)
+              Spacer()
+              Button("Done") { NativeUI.shared.dismiss(notifyLua: true) }.bold()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            RoomCatalogView()
+          }
+          .background(Color(uiColor: .systemBackground))
+          .ignoresSafeArea(.container, edges: .horizontal)
+        } else {
+          NavigationStack { RoomCatalogView().toolbar { DoneButton() } }
+        }
       default:
         GameMenuView()
       }
@@ -530,36 +547,105 @@ struct RoomCatalogView: View {
     return seen
   }
 
+  private let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+
   var body: some View {
-    List {
-      ForEach(categories, id: \.self) { category in
-        Section(category) {
-          ForEach((model.state.rooms ?? []).filter { $0.category == category }) { room in
-            Button {
-              NativeUI.post("pick_room", ["id": room.id])
-            } label: {
-              HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(room.name).foregroundStyle(room.affordable ? .primary : .secondary)
-                  if room.quick {
-                    Label("Quick Build", systemImage: "bolt.fill")
-                      .font(.caption)
-                      .foregroundStyle(.tint)
-                  }
-                }
-                Spacer()
-                Text(room.cost)
-                  .monospacedDigit()
-                  .foregroundStyle(room.affordable ? .secondary : Color.red)
-              }
+    ScrollView {
+      LazyVGrid(columns: columns, alignment: .leading, spacing: 10, pinnedViews: [.sectionHeaders]) {
+        ForEach(categories, id: \.self) { category in
+          Section {
+            ForEach((model.state.rooms ?? []).filter { $0.category == category }) { room in
+              RoomCard(room: room)
             }
-            .disabled(!room.affordable)
-            .accessibilityLabel(room.name)
+          } header: {
+            Text(category)
+              .font(.headline)
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(.vertical, 6)
+              .background(Color(uiColor: .systemBackground))
           }
         }
       }
+      .padding(.horizontal, 12)
+      .padding(.bottom, 12)
     }
     .navigationTitle("Build Room")
     .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+struct RoomCard: View {
+  let room: RoomOption
+
+  var body: some View {
+    Button {
+      NativeUI.post("pick_room", ["id": room.id])
+    } label: {
+      VStack(spacing: 6) {
+        GamePicture(path: room.image)
+          .frame(height: 64)
+          .frame(maxWidth: .infinity)
+        Text(room.name)
+          .font(.subheadline.weight(.semibold))
+          .foregroundStyle(.primary)
+          .lineLimit(2)
+          .minimumScaleFactor(0.8)
+          .multilineTextAlignment(.center)
+        HStack(spacing: 4) {
+          if room.quick {
+            Image(systemName: "bolt.fill").foregroundStyle(.tint)
+          }
+          Text(room.cost).monospacedDigit()
+            .foregroundStyle(room.affordable ? Color.secondary : Color.red)
+        }
+        .font(.caption)
+      }
+      .padding(10)
+      .frame(maxWidth: .infinity, minHeight: 140)
+      .background(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .fill(Color(uiColor: .secondarySystemBackground)))
+      .overlay(alignment: .topTrailing) {
+        if room.quick {
+          Text("Quick")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.accentColor))
+            .foregroundStyle(.white)
+            .padding(6)
+        }
+      }
+      .opacity(room.affordable ? 1 : 0.5)
+    }
+    .buttonStyle(.plain)
+    .disabled(!room.affordable)
+    .accessibilityLabel(room.quick ? "\(room.name), Quick Build, \(room.cost)" : "\(room.name), \(room.cost)")
+  }
+}
+
+// A picture made from the game's own art (see NativeUI:pictureDir in
+// lua/native_ui.lua), scaled up with sharp pixels like the game itself.
+struct GamePicture: View {
+  let path: String?
+  private static var cache: [String: UIImage] = [:]
+
+  var body: some View {
+    if let path = path, let image = GamePicture.load(path) {
+      Image(uiImage: image)
+        .interpolation(.none)
+        .resizable()
+        .scaledToFit()
+        .accessibilityHidden(true)
+    } else {
+      Color.clear
+    }
+  }
+
+  private static func load(_ path: String) -> UIImage? {
+    if let image = cache[path] { return image }
+    guard let image = UIImage(contentsOfFile: path) else { return nil }
+    cache[path] = image
+    return image
   }
 }

@@ -22,8 +22,12 @@ SOFTWARE.
 
 #include "native_bridge.h"
 
+#include <png.h>
+
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "lua.hpp"
 #include "touch_ui.h"
@@ -161,6 +165,100 @@ int l_tap(lua_State* L) {
   return 1;
 }
 
+// renderToPNG(path, width, height, draw) points the game's renderer at an
+// offscreen picture of that size, calls draw() (which draws with the game's
+// own code, e.g. an animation onto TheApp.video at picture coordinates), and
+// saves the drawn part (empty borders trimmed) as a PNG with transparency.
+// Used to show the game's art
+// in native menus. Returns true or nil, error.
+int l_render_to_png(lua_State* L) {
+  const char* path = luaL_checkstring(L, 1);
+  int width = static_cast<int>(luaL_checkinteger(L, 2));
+  int height = static_cast<int>(luaL_checkinteger(L, 3));
+  luaL_checktype(L, 4, LUA_TFUNCTION);
+  SDL_Window* window = SDL_GetKeyboardFocus();
+  for (Uint32 id = 1; window == nullptr && id < 16; ++id) {
+    window = SDL_GetWindowFromID(id);
+  }
+  SDL_Renderer* renderer = window != nullptr ? SDL_GetRenderer(window) : nullptr;
+  if (renderer == nullptr || width <= 0 || height <= 0) {
+    lua_pushnil(L);
+    lua_pushliteral(L, "no renderer");
+    return 2;
+  }
+  SDL_Texture* previous = SDL_GetRenderTarget(renderer);
+  SDL_Texture* picture =
+      SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888,
+                        SDL_TEXTUREACCESS_TARGET, width, height);
+  if (picture == nullptr || SDL_SetRenderTarget(renderer, picture) != 0) {
+    if (picture != nullptr) SDL_DestroyTexture(picture);
+    lua_pushnil(L);
+    lua_pushstring(L, SDL_GetError());
+    return 2;
+  }
+  SDL_SetTextureBlendMode(picture, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+  SDL_RenderClear(renderer);
+
+  lua_pushvalue(L, 4);
+  int status = lua_pcall(L, 0, 0, 0);
+
+  // ABGR8888 is R, G, B, A in memory order on little-endian machines, which
+  // is libpng's RGBA.
+  std::vector<unsigned char> pixels(static_cast<size_t>(width) * height * 4);
+  bool read = SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ABGR8888,
+                                   pixels.data(), width * 4) == 0;
+  SDL_SetRenderTarget(renderer, previous);
+  SDL_DestroyTexture(picture);
+  if (status != LUA_OK) {
+    lua_pushnil(L);
+    lua_insert(L, -2);  // nil, error message
+    return 2;
+  }
+  if (!read) {
+    lua_pushnil(L);
+    lua_pushstring(L, SDL_GetError());
+    return 2;
+  }
+  // Trim to the pixels that were drawn, keeping a one pixel margin.
+  int min_x = width;
+  int min_y = height;
+  int max_x = -1;
+  int max_y = -1;
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      if (pixels[(static_cast<size_t>(y) * width + x) * 4 + 3] != 0) {
+        min_x = std::min(min_x, x);
+        max_x = std::max(max_x, x);
+        min_y = std::min(min_y, y);
+        max_y = std::max(max_y, y);
+      }
+    }
+  }
+  if (max_x < 0) {
+    min_x = min_y = max_x = max_y = 0;  // Nothing drawn: a 1x1 picture.
+  } else {
+    min_x = std::max(0, min_x - 1);
+    min_y = std::max(0, min_y - 1);
+    max_x = std::min(width - 1, max_x + 1);
+    max_y = std::min(height - 1, max_y + 1);
+  }
+  png_image image{};
+  image.version = PNG_IMAGE_VERSION;
+  image.width = static_cast<png_uint_32>(max_x - min_x + 1);
+  image.height = static_cast<png_uint_32>(max_y - min_y + 1);
+  image.format = PNG_FORMAT_RGBA;
+  const unsigned char* first =
+      pixels.data() + (static_cast<size_t>(min_y) * width + min_x) * 4;
+  if (!png_image_write_to_file(&image, path, 0, first, width * 4, nullptr)) {
+    lua_pushnil(L);
+    lua_pushstring(L, image.message);
+    return 2;
+  }
+  lua_pushboolean(L, 1);
+  return 1;
+}
+
 int l_set_cursor_speed(lua_State* L) {
   touch_ui::set_cursor_speed(luaL_checknumber(L, 1));
   return 0;
@@ -175,6 +273,7 @@ constexpr luaL_Reg native_lib[] = {{"available", l_available},
                                    {"screen", l_screen},
                                    {"post", l_post},
                                    {"tap", l_tap},
+                                   {"renderToPNG", l_render_to_png},
                                    {"setCursorSpeed", l_set_cursor_speed},
                                    {nullptr, nullptr}};
 

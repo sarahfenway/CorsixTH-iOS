@@ -10,6 +10,9 @@ native_tap Build Room
 wait_until 3000 require("sdl").native.screen() == "room_catalog"
 wait 1000
 screenshot 1_catalog
+# Every room card has a picture made from the game's own art.
+lua local n, total = 0, 0; for _, r in ipairs(TheApp.native:roomList()) do total = total + 1; if r.image and lfs.attributes(r.image, "size") then n = n + 1 end end; rawset(_G, "auto_pics", n == total and total > 0); return n .. " of " .. total
+expect rawget(_G, "auto_pics")
 expect TheApp.world:getCurrentSpeed() ~= "Pause"
 # Other rooms still go through CorsixTH's own editor.
 lua require("sdl").native.post("pick_room", '{"id":"psych"}')
