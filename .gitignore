@@ -10,3 +10,7 @@ tools/cmake-*/
 .team-id
 .bundle-id
 CorsixTH/
+
+# Working notes kept locally, not published
+CLAUDE.md
+docs/superpowers/

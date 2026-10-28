@@ -215,9 +215,11 @@ are created inside it.
 
 ## Developing
 
-Read [`CLAUDE.md`](CLAUDE.md) first: it maps the code and lists the rules (our code goes in `src/`
-and `lua/`; changes to CorsixTH's own files go in `patches/corsixth-ios.patch`; no game data or
-CorsixTH source in git). [`PLAN.md`](PLAN.md) is the roadmap.
+The rules: our code goes in `src/` and `lua/`; changes to CorsixTH's own files are kept as small
+hooks in `patches/corsixth-ios.patch` (after editing `CorsixTH/`, regenerate it with
+`git -C CorsixTH diff > patches/corsixth-ios.patch`); touch and iOS behaviour stays behind touch
+mode, so desktop CorsixTH is unchanged; the game's own code does every check and charge; and no game
+data or CorsixTH source goes in git. [`PLAN.md`](PLAN.md) is the roadmap.
 
 ```bash
 bash build-ios.sh --simulator             # build and run in the iOS Simulator
@@ -226,7 +228,15 @@ bash build-ios.sh --run tests/automation  # build, then run every scripted test;
 
 The scripted tests drive the game in the simulator with real touch events and check its state
 (results and screenshots go to `build-ios/automation/`). They need the game data, like any build.
-The unit tests for the touch code need only a C++ compiler; see `CLAUDE.md`.
+The unit tests for the touch code need only a C++ compiler:
+
+```bash
+c++ -std=c++17 -Isrc tests/test_touch_gestures.cpp src/touch_gestures.cpp -o /tmp/tg && /tmp/tg
+```
+
+```bash
+c++ -std=c++17 -Isrc tests/test_touch_storage.cpp src/touch_storage.cpp -o /tmp/ts && /tmp/ts
+```
 
 ## Licence
 

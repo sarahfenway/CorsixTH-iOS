@@ -19,7 +19,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
 --! Native controls for CorsixTH's own room editor (door, windows, furniture)
--- and corridor furnishing. See docs/superpowers/specs/2026-10-28-room-editor-design.md.
+-- and corridor furnishing.
 --
 -- The game's windows (UIEditRoom, UIFurnishCorridor, UIPlaceObjects) keep
 -- doing all the work; they're just moved off screen. While placing, touches

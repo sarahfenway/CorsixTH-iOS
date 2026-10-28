@@ -1,6 +1,7 @@
 # Plan: make CorsixTH feel like an iPhone/iPad game
 
-Read `CLAUDE.md` first for the layout, build commands and rules.
+The README's "Developing" and "How the port is put together" sections cover the layout, build
+commands and rules.
 
 ## Where things stand
 
@@ -48,7 +49,7 @@ desktop build) are still open. Harness command list: `src/touch_automation.h`.
    paths (`deps/`, `build-ios/`, `ThemeHospital/`, `Music/`).
 2. **Simulator build path.** Add a `--simulator [device name]` option to `build-ios.sh` that
    generates the project if needed (without opening Xcode), builds for the simulator, installs and
-   launches. The commands are in `CLAUDE.md`. If iCloud entitlements get in the way of simulator
+   launches. If iCloud entitlements get in the way of simulator
    signing, build with `ICLOUD=OFF` for the simulator.
 3. **Automation harness.** Add an in-app script runner so UI flows can be repeated and screenshotted
    without a human. Keep it in the touch build only, and only active when an environment variable
@@ -153,7 +154,7 @@ screenshots, then on Sarah's iPhone and iPad.
 
 ## Phase 1b: touch-first building (started 28 Oct 2026)
 
-Quick Build is done in the simulator for all 23 rooms (spec and plan in `docs/superpowers/`):
+Quick Build is done in the simulator for all 23 rooms:
 native room catalogue (side panel, room pictures from the game), proposed outline with finger
 handles over the engine's blueprint, built by driving the engine's own editor with only the
 required furniture. Next candidates: optional extras (radiators, plants, extra loos) and nicer
@@ -227,6 +228,6 @@ back: bridge actions that call existing Lua functions. Suggested order:
 - Small, reviewable steps. After each phase, write a short note for Sarah: what changed, what was
   verified in the simulator, and what she needs to check on her phone or iPad.
 - `build-ios.sh` on a clean checkout must reproduce the app. Our code stays out of `CorsixTH/`
-  (see `CLAUDE.md`): new code in `src/`, only unavoidable hooks in `patches/corsixth-ios.patch`.
+  (see the README): new code in `src/`, only unavoidable hooks in `patches/corsixth-ios.patch`.
 - Desktop CorsixTH behaviour must not change. Gate everything on touch mode.
 - Never commit or redistribute Theme Hospital's data files.
