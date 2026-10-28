@@ -45,8 +45,9 @@ you'd rather get it yourself, download the
 [CorsixTH 0.70.1 source](https://github.com/CorsixTH/CorsixTH/releases/tag/v0.70.1) and unzip it
 so that `CorsixTH/CorsixTH/CorsixTH.lua` exists before running the script.
 
-Every app needs a bundle ID that no other developer has registered, and the default one is
-taken, so on your first run give your own in reverse-DNS form (any name you like):
+Every app needs a bundle ID that no other developer has registered. The default,
+`com.example.corsixth`, is only a placeholder, so on your first run give your own in reverse-DNS
+form (any name you like):
 
 ```bash
 BUNDLE_ID=com.yourname.themehospital bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
@@ -164,8 +165,8 @@ settings. Sound effects and the announcer work as normal.
   **iCloud Documents** and the container `iCloud.` followed by your bundle ID (press + to create it if
   needed), then build again. To skip iCloud entirely, use `ICLOUD=OFF bash build-ios.sh`.
 - **"Bundle identifier is not available":** another team has already registered that bundle ID
-  (the default one, or yours if Xcode first tried to sign with a different team: it registers the
-  ID with whichever team it uses). Pick a new one, `BUNDLE_ID=com.yourname.themehospital bash
+  (yours, if Xcode first tried to sign with a different team: it registers the ID with whichever
+  team it uses), or you're still on the `com.example` placeholder. Pick a new one, `BUNDLE_ID=com.yourname.themehospital bash
   build-ios.sh`, or delete it from the other team at developer.apple.com > Certificates,
   Identifiers & Profiles > Identifiers.
 - **CMake errors:** the whole log is in `build-ios.cmake.log`.

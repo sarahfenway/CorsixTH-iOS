@@ -30,7 +30,7 @@ set(GAME_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ThemeHospital CACHE PATH
     "Theme Hospital data folder (DATA, LEVELS, QDATA, SOUND...) to bundle")
 set(MUSIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Music CACHE PATH
     "Optional folder of .ogg/.mp3 music to bundle")
-set(CTH_BUNDLE_ID "uk.me.krn.corsixth" CACHE STRING "iOS bundle identifier")
+set(CTH_BUNDLE_ID "com.example.corsixth" CACHE STRING "iOS bundle identifier (use your own)")
 set(CTH_DEVELOPMENT_TEAM "" CACHE STRING "Apple development team ID for signing")
 option(CTH_ICLOUD "Keep save games in iCloud Drive (needs a paid developer account)" ON)
 

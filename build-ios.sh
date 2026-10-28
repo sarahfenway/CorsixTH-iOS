@@ -27,15 +27,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$PWD"
 
-# The app's bundle ID must be unique to your developer team. One given in
-# BUNDLE_ID is remembered for next time.
+# The app's bundle ID must be unique to your developer team, so give your own
+# in BUNDLE_ID; it's remembered for next time.
 BUNDLE_FILE="$ROOT/.bundle-id"
 if [ -n "${BUNDLE_ID:-}" ]; then
   printf '%s\n' "$BUNDLE_ID" > "$BUNDLE_FILE"
 elif [ -s "$BUNDLE_FILE" ]; then
   BUNDLE_ID="$(head -n 1 "$BUNDLE_FILE")"
 else
-  BUNDLE_ID="uk.me.krn.corsixth"
+  BUNDLE_ID="com.example.corsixth"  # A placeholder: give your own.
 fi
 CMAKE_VERSION="4.4.4"
 BUILD_DIR="$ROOT/build-ios"
@@ -264,6 +264,12 @@ if [ -z "$TEAM" ]; then
 fi
 if [ -n "$TEAM" ]; then
   note "Signing with team $TEAM, bundle ID $BUNDLE_ID (change with: ./build-ios.sh --team)"
+  case "$BUNDLE_ID" in
+    com.example.*)
+      note "That bundle ID is a placeholder Apple won't register. Give your own once, e.g."
+      note "  BUNDLE_ID=com.yourname.themehospital bash build-ios.sh"
+      ;;
+  esac
 else
   note "No team set - pick it in Xcode under Signing & Capabilities."
 fi
