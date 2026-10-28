@@ -109,10 +109,9 @@ an envelope when a message (fax) is waiting. The toolbar at the top right has:
 - **Build Room:** a panel lists the rooms with pictures. Pick one and the game suggests a spot;
   drag the handles to move or resize it. **Build** places the door and the required furniture for
   you. **Customise** lets you choose instead: tap a wall marker for the door, tap walls to add
-  windows, then place furniture from a tray by tapping the map (Auto places whatever's left, and
-  Extras buys more, such as plants and radiators).
-- **Furnish Corridor:** buy benches, reception desks, drinks machines and so on, then tap the map
-  to place them.
+  windows, then place furniture from a tray (Auto places whatever's left, and Extras buys more,
+  such as plants and radiators).
+- **Furnish Corridor:** buy benches, reception desks, drinks machines and so on, then place them.
 - **Edit Room:** tap a room to move, add or remove its furniture.
 - **Hire Staff:** a panel lists who's looking for work, with their faces, qualifications, skill
   and wages. The person you hire starts at a free reception desk (receptionists) or in the
@@ -122,9 +121,9 @@ an envelope when a message (fax) is waiting. The toolbar at the top right has:
 - **Speed** (play button), and **•••** for the game menu (save, load, settings, restart, quit),
   which pauses the game.
 
-While placing anything, tap where it should go, or drag: the item follows a little above your
-finger so you can see it, and lifting your finger puts it down. A long press on a placed item picks
-it up again. What the adviser says appears at the bottom left (tap for his next message; long press to dismiss
+While placing anything, the item starts somewhere it fits. Drag anywhere to move it (it moves as
+far as your finger, so your finger never hides it) or tap where it should go, then press **Place**,
+which only lights up where the item fits. A long press on a placed item picks it up again. What the adviser says appears at the bottom left (tap for his next message; long press to dismiss
 them all; past ones are under Hospital > Adviser Messages). Fax messages appear under the money as
 the game's own icons (tap to open; long press to
 dismiss the ones you can), with a bar on those that run out. Text entry uses the iOS keyboard. On an iPad,

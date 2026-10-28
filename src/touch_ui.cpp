@@ -83,12 +83,9 @@ int screen_h = 0;
 gesture_recogniser direct;
 trackpad_recogniser trackpad;
 bool trackpad_mode = true;
-// Placing things (native room editor): direct touches; a drag aims with the
-// pointer raised above the finger, so what's being placed isn't hidden under
-// it, and lifting places it. Taps place where they land.
-bool placement_mode = false;
+// The native editors' touch controls (see set_placement_mode()).
+placement_touch placing = placement_touch::off;
 bool trackpad_before_placement = true;
-constexpr float placement_offset_points = 40.0f;
 // The game's dialogs: with the trackpad, a gesture that starts on one is
 // handled by the direct recogniser (see set_direct_regions()).
 std::vector<region> direct_regions;
@@ -471,57 +468,41 @@ void poll() {
   }
   if (!trackpad_mode || gesture_direct) {
     direct.tick(SDL_GetTicks(), actions);  // long press
+  } else {
+    trackpad.tick(SDL_GetTicks(), actions);  // long press while placing
   }
   flush_actions();
 }
 
-void set_placement_mode(bool on) {
-  if (on == placement_mode) {
+void set_placement_mode(placement_touch mode) {
+  if (mode == placing) {
     return;
   }
-  if (on) {
+  if (placing == placement_touch::off) {
     trackpad_before_placement = trackpad_mode;
-    set_controls("direct");
-    placement_mode = true;
-    // Dragging aims above the finger; taps act where they land.
-    direct.set_aim_offset(static_cast<int>(std::lround(placement_offset())));
-  } else {
-    placement_mode = false;
-    direct.set_aim_offset(0);
+  }
+  placing = mode;
+  trackpad.set_pointer_mode(mode == placement_touch::place);
+  if (mode == placement_touch::off) {
     set_controls(trackpad_before_placement ? "trackpad" : "direct");
+  } else {
+    set_controls(mode == placement_touch::place ? "trackpad" : "direct");
   }
 }
 
-bool placement_mode_on() { return placement_mode; }
+placement_touch placement_mode() { return placing; }
+
+void move_pointer(int x, int y) {
+  if (!enabled()) {
+    return;
+  }
+  trackpad.warp_cursor(x, y);
+  actions.push_back({mouse_action::kind::move, 0, trackpad.cursor_x(), trackpad.cursor_y()});
+  flush_actions();
+}
 
 void set_direct_regions(std::vector<region> regions) {
   direct_regions = std::move(regions);
-}
-
-float placement_offset() {
-  // The window may not be known yet; then there's no offset to speak of.
-  SDL_Window* window = SDL_GetKeyboardFocus();
-  if (window == nullptr) {
-    window = SDL_GetMouseFocus();
-  }
-  for (Uint32 id = 1; window == nullptr && id < 16; ++id) {
-    window = SDL_GetWindowFromID(id);
-  }
-  SDL_Renderer* renderer = window != nullptr ? SDL_GetRenderer(window) : nullptr;
-  int wh = 0;
-  int lh = 0;
-  if (window != nullptr) {
-    int ww = 0;
-    SDL_GetWindowSize(window, &ww, &wh);
-  }
-  if (renderer != nullptr) {
-    int lw = 0;
-    SDL_RenderGetLogicalSize(renderer, &lw, &lh);
-  }
-  if (wh <= 0 || lh <= 0) {
-    return 0.0f;
-  }
-  return placement_offset_points * static_cast<float>(lh) / static_cast<float>(wh);
 }
 
 void set_cursor_speed(double speed) {

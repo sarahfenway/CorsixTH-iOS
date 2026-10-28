@@ -194,10 +194,7 @@ void gesture_recogniser::finger_move(int64_t finger, int x, int y,
   }
   switch (st) {
     case state::pending:
-      if (moved_far(origin_x, origin_y, x, y) && aim_offset > 0) {
-        st = state::aiming;
-        out.push_back({mouse_action::kind::move, 0, x, std::max(0, y - aim_offset)});
-      } else if (moved_far(origin_x, origin_y, x, y)) {
+      if (moved_far(origin_x, origin_y, x, y)) {
         if (now - down_time >= cfg.drag_delay_ms) {
           out.push_back(
               {mouse_action::kind::press, button_left, origin_x, origin_y});
@@ -211,9 +208,6 @@ void gesture_recogniser::finger_move(int64_t finger, int x, int y,
     case state::hovering:
     case state::dragging:
       out.push_back({mouse_action::kind::move, 0, x, y});
-      break;
-    case state::aiming:
-      out.push_back({mouse_action::kind::move, 0, x, std::max(0, y - aim_offset)});
       break;
     default:
       break;
@@ -274,13 +268,6 @@ void gesture_recogniser::finger_up(int64_t finger, int x, int y, uint32_t now,
       case state::hovering:
         out.push_back({mouse_action::kind::move, 0, x, y});
         break;
-      case state::aiming: {
-        int aim_y = std::max(0, y - aim_offset);
-        out.push_back({mouse_action::kind::move, 0, x, aim_y});
-        out.push_back({mouse_action::kind::press, button_left, x, aim_y});
-        out.push_back({mouse_action::kind::release, button_left, x, aim_y});
-        break;
-      }
       default:
         break;
     }
@@ -339,6 +326,28 @@ int trackpad_recogniser::cursor_x() const {
 
 int trackpad_recogniser::cursor_y() const {
   return static_cast<int>(std::lround(cy));
+}
+
+void trackpad_recogniser::set_pointer_mode(bool on) {
+  pointer_mode = on;
+  last_was_tap = false;
+  drag_armed = false;
+}
+
+void trackpad_recogniser::tick(uint32_t now, std::vector<mouse_action>& out) {
+  if (!pointer_mode || st != state::pending || fingers.size() != 1 ||
+      now - down_time < cfg.long_press_ms) {
+    return;
+  }
+  // A still finger: right click under it. Moving on carries the pointer.
+  const finger_info& f = fingers.front();
+  warp_cursor(f.x, f.y);
+  out.push_back({mouse_action::kind::move, 0, cursor_x(), cursor_y()});
+  click(button_right, out);
+  fingers.front().start_x = f.x;
+  fingers.front().start_y = f.y;
+  st = state::tracking;
+  last_move_time = now;
 }
 
 void trackpad_recogniser::warp_cursor(int x, int y) {
@@ -428,7 +437,7 @@ void trackpad_recogniser::finger_down(int64_t finger, int x, int y,
     down_time = now;
     last_move_time = now;
     // A touch that follows a tap closely turns into a drag if it moves.
-    drag_armed = last_was_tap && now - last_tap_time <= cfg.double_tap_ms;
+    drag_armed = !pointer_mode && last_was_tap && now - last_tap_time <= cfg.double_tap_ms;
     last_was_tap = false;
     return;
   }
@@ -559,7 +568,12 @@ void trackpad_recogniser::finger_up(int64_t finger, int x, int y,
 
   remove(finger);
   if (finger == primary) {
-    if (st == state::pending && now - down_time <= cfg.tap_ms) {
+    if (st == state::pending && pointer_mode) {
+      // Pointer mode: a tap (or a still touch let go before the long press)
+      // moves the pointer to the finger.
+      warp_cursor(x, y);
+      out.push_back({mouse_action::kind::move, 0, cursor_x(), cursor_y()});
+    } else if (st == state::pending && now - down_time <= cfg.tap_ms) {
       click(button_left, out);
       last_was_tap = true;
       last_tap_time = now;

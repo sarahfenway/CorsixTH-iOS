@@ -170,9 +170,12 @@ final class EditorOverlay {
 
   private func rebuildButtons(_ buttons: [EditorButton]) {
     buttonRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    // A full bar (placing: Rotate, Auto, Extras, Place, Done) doesn't fit a
+    // phone with every title; the plain buttons then show just their symbol.
+    let compact = buttons.count > 5
     for spec in buttons {
       var config: UIButton.Configuration = spec.prominent ? .borderedProminent() : .plain()
-      config.title = spec.title
+      config.title = compact && !spec.prominent && spec.symbol != nil ? nil : spec.title
       if let symbol = spec.symbol {
         config.image = UIImage(
           systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold))

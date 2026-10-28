@@ -23,10 +23,12 @@ SOFTWARE. --]]
 --
 -- The game's windows (UIEditRoom, UIFurnishCorridor, UIPlaceObjects) keep
 -- doing all the work; they're just moved off screen. While placing, touches
--- act directly on the map (SDL.native.setPlacementTouch), so the game's own
--- mouse handling places, rotates and picks things up. These sessions add the
--- native bar, wall markers and item tray, and call the game's functions for
--- what those offer.
+-- move the game's pointer (SDL.native.setPlacementTouch("place")): a drag
+-- moves the item's ghost, a tap moves it to the finger, a long press picks a
+-- placed item up (right click). Nothing is placed until the bar's Place
+-- button, which clicks as the mouse would. These sessions add the native
+-- bar, wall markers and item tray, and call the game's functions for what
+-- those offer.
 
 local json = corsixth.require("ios.json")
 local planner = corsixth.require("ios.room_planner")
@@ -47,6 +49,83 @@ local function unhide(window)
   if window.x <= OFFSCREEN / 2 then
     window.x = window.native_saved_x or 100
   end
+end
+
+--! Whether the item being placed fits with its cell at (x, y), asked of the
+-- game as hovering the mouse there would.
+local function fits(window, x, y)
+  window:setBlueprintCell(x, y)
+  return window.object_blueprint_good and not TheApp.world:anyHumanoidObscuringArea(x, y)
+end
+
+--! Moves the pointer, and so the item's ghost, to the nearest tile where the
+-- item being placed fits, unless it fits where it is. rect is the room's
+-- outline ({x, y, w, h}); without one (corridors), tiles near the ghost.
+local function aim(window, rect)
+  local entry = window.place_objects ~= false and window.objects[window.active_index or 0]
+  if not entry or entry.object.locked_to_wall then
+    return -- (The game keeps wall items on the wall itself.)
+  end
+  local ui = window.ui
+  local cx, cy = window.object_cell_x, window.object_cell_y
+  if not cx then
+    local wx, wy = ui:ScreenToWorld(ui.cursor_x or 0, ui.cursor_y or 0)
+    cx, cy = math.floor(wx), math.floor(wy)
+  end
+  if window.object_cell_x and fits(window, cx, cy) then
+    return
+  end
+  local tiles = {}
+  local map = TheApp.world.map
+  local x1, y1, x2, y2
+  if rect then
+    x1, y1, x2, y2 = rect.x, rect.y, rect.x + rect.w - 1, rect.y + rect.h - 1
+  else
+    x1, y1, x2, y2 = cx - 8, cy - 8, cx + 8, cy + 8
+  end
+  for y = math.max(1, y1), math.min(map.height, y2) do
+    for x = math.max(1, x1), math.min(map.width, x2) do
+      tiles[#tiles + 1] = { x = x, y = y, d = (x - cx) ^ 2 + (y - cy) ^ 2 }
+    end
+  end
+  table.sort(tiles, function(a, b)
+    if a.d ~= b.d then return a.d < b.d end
+    return a.y < b.y or (a.y == b.y and a.x < b.x)
+  end)
+  for _, tile in ipairs(tiles) do
+    if fits(window, tile.x, tile.y) then
+      local sx, sy = ui:WorldToScreen(tile.x + 0.5, tile.y + 0.5)
+      SDL.native.movePointer(sx, sy)
+      return
+    end
+  end
+  window:setBlueprintCell(cx, cy) -- Nowhere fits: leave it be.
+end
+
+--! The Place button: a left click on the map, as the game's window handles
+-- it (it checks the item fits and nobody's in the way). Then the next item
+-- goes somewhere it fits.
+local function place(native, window, rect)
+  if #window.objects == 0 or not window.object_cell_x then
+    return
+  end
+  if window.object_blueprint_good and
+      TheApp.world:anyHumanoidObscuringArea(window.object_cell_x, window.object_cell_y) then
+    native:message("Someone's in the way.")
+    return
+  end
+  window:onMouseUp("left", -1, -1) -- (Outside the window itself, which is off screen.)
+  aim(window, rect)
+end
+
+--! The bar's hint while placing.
+local function placing_hint(window)
+  if #window.objects == 0 then
+    return "Long press an item to move it"
+  elseif window.object_blueprint_good then
+    return "Drag to move it, then Place"
+  end
+  return "Doesn't fit here: drag it somewhere else"
 end
 
 local function button(id, title, symbol, enabled, prominent)
@@ -103,9 +182,22 @@ function RoomEditor.adopt(native, edit, door)
   self.edit = edit
   edit.visible = true
   hide(edit)
-  SDL.native.setPlacementTouch(true)
+  self:updateTouch()
   self:sendState(true)
   return self
+end
+
+--! Placing items: touches move the pointer ("place"); other stages tap
+-- directly. On reaching the objects stage the first item goes where it fits.
+function RoomEditor:updateTouch()
+  local placing = self.edit.phase == "objects" and not self.buying
+  if placing ~= self.placing then
+    self.placing = placing
+    SDL.native.setPlacementTouch(placing and "place" or true)
+    if placing then
+      aim(self.edit, self.edit.blueprint_rect)
+    end
+  end
 end
 
 --! Wall segments of the outline where a door or window could go: every
@@ -239,15 +331,20 @@ function RoomEditor:sendState(force)
     state.buttons = { button("back", "Back", "chevron.left") }
   elseif phase == "objects" then
     local left = #edit.objects
-    state.hint = left > 0 and "Tap the map to place" or
-        "Long press an item to move it"
+    state.hint = placing_hint(edit)
     state.tray = { place = place_rows(self.native, edit), buying = false }
     state.buttons = {
       button("rotate", "Rotate", "rotate.right", left > 0),
       button("place_rest", "Auto", "wand.and.stars", left > 0),
       button("buy", "Extras", "cart"),
-      button("done", "Done", "checkmark", edit.confirm_button.enabled, true),
     }
+    if left > 0 then
+      state.buttons[#state.buttons + 1] =
+          button("place", "Place", "arrow.down.to.line", edit.object_blueprint_good == true, true)
+    end
+    -- (Done can come before everything's placed: extras are optional.)
+    state.buttons[#state.buttons + 1] =
+        button("done", "Done", "checkmark", edit.confirm_button.enabled, left == 0)
   end
   -- Cancel is always there (first).
   table.insert(state.buttons, 1, button("cancel", nil, "trash"))
@@ -297,6 +394,7 @@ function RoomEditor:onTick()
   if self.buying and self.buying.x > OFFSCREEN / 2 then
     hide(self.buying)
   end
+  self:updateTouch()
   self:sendState(false)
   return false
 end
@@ -381,6 +479,8 @@ function RoomEditor:pressed(id)
     end
   elseif id == "rotate" then
     edit:tryNextOrientation()
+  elseif id == "place" then
+    place(self.native, edit, edit.blueprint_rect)
   elseif id == "place_rest" then
     local door = edit.room and edit.room.door
     local QuickBuild = corsixth.require("ios.quick_build")
@@ -418,6 +518,7 @@ function RoomEditor:select(index)
     if edit.in_pickup_mode then
       edit:stopPickupItems()
     end
+    aim(edit, edit.blueprint_rect)
   end
   self:sendState(true)
 end
@@ -452,7 +553,10 @@ function Furnisher:take(window)
   self.window = window
   self.placing = class.is(window, UIPlaceObjects)
   hide(window)
-  SDL.native.setPlacementTouch(self.placing)
+  SDL.native.setPlacementTouch(self.placing and "place" or false)
+  if self.placing then
+    aim(window, nil)
+  end
   self:sendState(true)
 end
 
@@ -465,13 +569,17 @@ function Furnisher:sendState(force)
   }
   if self.placing then
     local left = #window.objects
-    state.hint = left > 0 and "Tap the map to place" or "All placed"
+    state.hint = left > 0 and placing_hint(window) or "All placed"
     state.tray = { place = place_rows(self.native, window), buying = false }
     state.buttons = {
       button("cancel", nil, "trash"),
       button("rotate", "Rotate", "rotate.right", left > 0),
-      button("done", "Done", "checkmark", true, true),
     }
+    if left > 0 then
+      state.buttons[#state.buttons + 1] =
+          button("place", "Place", "arrow.down.to.line", window.object_blueprint_good == true, true)
+    end
+    state.buttons[#state.buttons + 1] = button("done", "Done", "checkmark", true, left == 0)
   else
     state.hint = "Choose items to buy"
     state.tray = { buy = buy_rows(self.native, window),
@@ -538,6 +646,8 @@ function Furnisher:pressed(id)
     window:confirm()
   elseif id == "rotate" and self.placing then
     window:tryNextOrientation()
+  elseif id == "place" and self.placing then
+    place(self.native, window, nil)
   end
   self:sendState(true)
 end
@@ -551,6 +661,7 @@ function Furnisher:select(index)
     else
       window:setActiveIndex(index)
     end
+    aim(window, nil)
   end
   self:sendState(true)
 end

@@ -294,9 +294,23 @@ int l_render_to_png(lua_State* L) {
   return 1;
 }
 
-// setPlacementTouch(on): direct touches with a raised pointer while placing.
+// setPlacementTouch(mode): the native editors' touch controls: "place"
+// (placing an item), true or "pick" (direct taps), false (the player's own).
 int l_set_placement_touch(lua_State* L) {
-  touch_ui::set_placement_mode(lua_toboolean(L, 1) != 0);
+  touch_ui::placement_touch mode = touch_ui::placement_touch::off;
+  if (lua_type(L, 1) == LUA_TSTRING && std::strcmp(lua_tostring(L, 1), "place") == 0) {
+    mode = touch_ui::placement_touch::place;
+  } else if (lua_toboolean(L, 1)) {
+    mode = touch_ui::placement_touch::pick;
+  }
+  touch_ui::set_placement_mode(mode);
+  return 0;
+}
+
+// movePointer(x, y): moves the game's pointer there (game pixels).
+int l_move_pointer(lua_State* L) {
+  touch_ui::move_pointer(static_cast<int>(std::lround(luaL_checknumber(L, 1))),
+                         static_cast<int>(std::lround(luaL_checknumber(L, 2))));
   return 0;
 }
 
@@ -321,11 +335,6 @@ int l_set_direct_regions(lua_State* L) {
   return 0;
 }
 
-// placementOffset(): how far above the finger the pointer is, in game pixels.
-int l_placement_offset(lua_State* L) {
-  lua_pushnumber(L, touch_ui::placement_offset());
-  return 1;
-}
 
 int l_set_cursor_speed(lua_State* L) {
   touch_ui::set_cursor_speed(luaL_checknumber(L, 1));
@@ -344,7 +353,7 @@ constexpr luaL_Reg native_lib[] = {{"available", l_available},
                                    {"tap", l_tap},
                                    {"renderToPNG", l_render_to_png},
                                    {"setPlacementTouch", l_set_placement_touch},
-                                   {"placementOffset", l_placement_offset},
+                                   {"movePointer", l_move_pointer},
                                    {"setDirectRegions", l_set_direct_regions},
                                    {"setCursorSpeed", l_set_cursor_speed},
                                    {nullptr, nullptr}};

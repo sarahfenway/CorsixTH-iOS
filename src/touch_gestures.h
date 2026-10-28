@@ -76,8 +76,6 @@ class pinch_tracker {
                                       an object before tapping to place it)
     - long press                   -> right click
     - two-finger tap               -> right click
-    - with an aim offset (placing things): drag -> the pointer follows above
-      the finger, lift -> left click there
     - two-finger drag              -> middle button drag (pans the map)
     - pinch                        -> zoom, once the spacing has changed by
                                       more than pinch_threshold
@@ -105,16 +103,11 @@ class gesture_recogniser {
                  std::vector<mouse_action>& out);
   //! Handles time based gestures (long press). Call regularly.
   void tick(uint32_t now, std::vector<mouse_action>& out);
-  //! Placing things: with an offset, a one-finger drag aims `offset` pixels
-  //! above the finger (so the finger doesn't hide what's being placed) and
-  //! lifting clicks there; taps and long presses still act where they land.
-  //! 0 turns it off.
-  void set_aim_offset(int offset) { aim_offset = offset; }
   //! Forget all touches, releasing any button that is held.
   void cancel(std::vector<mouse_action>& out);
 
  private:
-  enum class state { idle, pending, hovering, dragging, aiming, consumed, multi };
+  enum class state { idle, pending, hovering, dragging, consumed, multi };
   struct finger_info {
     int64_t id;
     int start_x;
@@ -143,7 +136,6 @@ class gesture_recogniser {
   int pan_start_y{0};
   int tap_x{0};
   int tap_y{0};
-  int aim_offset{0};
 };
 
 //! Turns touches into mouse actions with the screen acting as a trackpad: the
@@ -156,6 +148,11 @@ class gesture_recogniser {
     - two-finger drag               -> pans the map; the cursor stays put
     - pinch                         -> zoom, once the spacing has changed by
                                        more than pinch_threshold
+
+    In pointer mode (placing things) nothing clicks with the left button: a
+    drag moves the pointer (and the item being placed) as above, a tap moves
+    it to the finger, and a long press right-clicks under the finger (picks a
+    placed item up). Two fingers still pan and zoom.
 */
 class trackpad_recogniser {
  public:
@@ -166,6 +163,7 @@ class trackpad_recogniser {
     int move_threshold = 8;            // logical pixels before a touch moves
     int pinch_threshold = 28;          // change in finger spacing before zooming
     double speed = 1.0;                // cursor speed multiplier
+    uint32_t long_press_ms = 500;      // pointer mode: still touch -> right click
   };
 
   trackpad_recogniser() = default;
@@ -185,6 +183,11 @@ class trackpad_recogniser {
 
   //! Cursor speed multiplier (1 = the finger's own distance).
   void set_speed(double speed) { cfg.speed = speed; }
+
+  //! Pointer mode, for placing things (see the class comment).
+  void set_pointer_mode(bool on);
+  //! Handles the long press of pointer mode. Call regularly.
+  void tick(uint32_t now, std::vector<mouse_action>& out);
 
   int cursor_x() const;
   int cursor_y() const;
@@ -231,6 +234,7 @@ class trackpad_recogniser {
   double cx{0};
   double cy{0};
   bool cursor_announced{false};
+  bool pointer_mode{false};
 };
 
 }  // namespace touch_ui

@@ -70,12 +70,20 @@ bool handle_event(const SDL_Event& e);
 //! cursor like a laptop trackpad) or "direct" (click where you touch).
 void set_controls(const char* name);
 
-//! Placing things: touches act directly. A tap places where it lands; a drag
-//! aims with the pointer about 40 points above the finger, so the finger
-//! doesn't hide what's being placed, and lifting places it there. Turning it
-//! off restores the player's own touch controls.
-void set_placement_mode(bool on);
-bool placement_mode_on();
+//! Touch controls for the native editors, whatever the player's own setting:
+//!  - pick: direct, a tap clicks where it lands (choosing a room or a wall).
+//!  - place: placing an item. A drag moves the pointer (and the item's ghost)
+//!    like the trackpad, so the finger never hides it; a tap moves it to the
+//!    finger; a long press right-clicks there (picks a placed item up).
+//!    Nothing is placed by touch: the editor's Place button does that.
+//! off restores the player's own controls.
+enum class placement_touch { off, pick, place };
+void set_placement_mode(placement_touch mode);
+placement_touch placement_mode();
+
+//! Moves the game's pointer to (x, y) in logical pixels, as a mouse move
+//! (the trackpad carries on from there).
+void move_pointer(int x, int y);
 
 //! A rectangle of the game's screen, in logical pixels.
 struct region {
@@ -91,9 +99,6 @@ struct region {
 //! the cursor then carries on from there. Elsewhere the trackpad is
 //! unchanged.
 void set_direct_regions(std::vector<region> regions);
-
-//! The placement pointer's offset above the finger, in game pixels.
-float placement_offset();
 
 //! Sets the trackpad cursor speed multiplier (1 = the finger's distance).
 void set_cursor_speed(double speed);

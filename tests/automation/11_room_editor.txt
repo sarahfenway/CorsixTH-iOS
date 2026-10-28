@@ -1,7 +1,8 @@
 # Native room editor: build a GP's office step by step (door, a window,
 # furniture, a bought plant placed by touch), edit it (move the plant), then
-# furnish a corridor (a reception desk placed by touch). The game's own
-# editor checks, places and charges for everything.
+# furnish a corridor (a reception desk placed by touch). Placing is move, then
+# Place: touches move the item's ghost and the bar's Place button puts it
+# down. The game's own editor checks, places and charges for everything.
 wait_until 30000 TheApp.ui ~= nil
 lua TheApp:loadLevel(1, "easy")
 wait_until 30000 TheApp.world ~= nil
@@ -62,10 +63,15 @@ native_tap Buy
 wait_until 3000 TheApp.native.editor.buying == nil
 expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
 expect TheApp.ui:getWindow(UIEditRoom).objects[1].object.id == "plant"
-# Place it by touch: find a tile the game accepts, then tap there (a tap
-# places right where it lands).
+# The plant's ghost starts somewhere it fits, with Place ready.
+expect TheApp.ui:getWindow(UIEditRoom).object_blueprint_good
+# A tap moves the ghost there; nothing is placed until Place.
 lua local edit = TheApp.ui:getWindow(UIEditRoom); local r = edit.blueprint_rect; edit.place_objects = true; edit:setActiveIndex(1); local spot; for y = r.y, r.y + r.h - 1 do for x = r.x, r.x + r.w - 1 do if not spot then edit:setBlueprintCell(x, y); if edit.object_blueprint_good then spot = {x, y} end end end end; rawset(_G, "auto_spot", spot); local sx, sy = TheApp.ui:WorldToScreen(spot[1] + 0.5, spot[2] + 0.5); rawset(_G, "auto_tap", {sx, sy}); return ("%d,%d -> %.0f,%.0f"):format(spot[1], spot[2], sx, sy)
 tap_at rawget(_G, "auto_tap")
+wait 500
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
+expect TheApp.ui:getWindow(UIEditRoom).object_cell_x == rawget(_G, "auto_spot")[1] and TheApp.ui:getWindow(UIEditRoom).object_cell_y == rawget(_G, "auto_spot")[2]
+native_tap Place
 wait 500
 lua local n = 0; for o in pairs(TheApp.ui:getWindow(UIEditRoom).room.objects) do if o.object_type.id == "plant" then n = n + 1 end end; return n
 expect #TheApp.ui:getWindow(UIEditRoom).objects == 0
@@ -79,7 +85,7 @@ expect rawget(_G, "auto_gp").built and rawget(_G, "auto_objects").plant == 1 and
 expect TheApp.ui.hospital.balance < rawget(_G, "auto_money")
 screenshot 6_built
 # Edit the room: pick it with a tap, then move the plant (long press picks it
-# up, a tap puts it down).
+# up, a tap moves it, Place puts it down).
 lua TheApp.ui:getWindow(UIInformation):close()
 native_tap Edit Room
 wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui.edit_room == true
@@ -95,6 +101,9 @@ wait 500
 expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
 lua local edit = TheApp.ui:getWindow(UIEditRoom); local r = edit.blueprint_rect; local old = rawget(_G, "auto_plant_obj"); local spot; for y = r.y + r.h - 1, r.y, -1 do for x = r.x + r.w - 1, r.x, -1 do if not spot and (x ~= old.tile_x or y ~= old.tile_y) then edit:setBlueprintCell(x, y); if edit.object_blueprint_good then spot = {x, y} end end end end; rawset(_G, "auto_spot2", spot); return spot[1] .. "," .. spot[2]
 tap_at (function() local s = rawget(_G, "auto_spot2"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {sx, sy} end)()
+wait 500
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
+native_tap Place
 wait 500
 expect #TheApp.ui:getWindow(UIEditRoom).objects == 0
 native_tap Done
@@ -113,8 +122,19 @@ native_tap Buy
 wait_until 3000 TheApp.ui:getWindow(UIPlaceObjects) ~= nil and TheApp.native.editor ~= nil and TheApp.native.editor.placing
 wait 500
 lua local w = TheApp.ui:getWindow(UIPlaceObjects); w.place_objects = true; local cx, cy = TheApp.ui:ScreenToWorld(TheApp.config.width / 2, TheApp.config.height / 2); cx, cy = math.floor(cx), math.floor(cy); local spot; for r = 0, 15 do for dy = -r, r do for dx = -r, r do if not spot and math.max(math.abs(dx), math.abs(dy)) == r then w:setBlueprintCell(cx + dx, cy + dy); if w.object_blueprint_good then spot = {cx + dx, cy + dy} end end end end end; rawset(_G, "auto_spot3", spot); return spot and (spot[1] .. "," .. spot[2]) or "none"
-# Drag to aim (the desk follows above the finger) and lift to place it.
-drag_at (function() local s = rawget(_G, "auto_spot3"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); local off = require("sdl").native.placementOffset(); return {sx - 60, sy + off + 30, sx, sy + off} end)()
+# A drag moves the ghost by as much as the finger moves (wherever the finger
+# is), and lifting places nothing.
+lua local w = TheApp.ui:getWindow(UIPlaceObjects); rawset(_G, "auto_before", {TheApp.ui.cursor_x, TheApp.ui.cursor_y, w.object_cell_x, w.object_cell_y}); return table.concat(auto_before, ",")
+drag_at {100, 300, 180, 300}
+wait 500
+lua local w = TheApp.ui:getWindow(UIPlaceObjects); local b = rawget(_G, "auto_before"); return (TheApp.ui.cursor_x - b[1]) .. "," .. (TheApp.ui.cursor_y - b[2]) .. " cell " .. tostring(w.object_cell_x) .. "," .. tostring(w.object_cell_y)
+expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_before")[1] - 80) <= 30 and math.abs(TheApp.ui.cursor_y - rawget(_G, "auto_before")[2]) <= 10
+expect #TheApp.ui:getWindow(UIPlaceObjects).objects == 1
+# Tap where it should go, then Place.
+tap_at (function() local s = rawget(_G, "auto_spot3"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {sx, sy} end)()
+wait 500
+expect TheApp.ui:getWindow(UIPlaceObjects).object_blueprint_good
+native_tap Place
 wait 800
 lua local n = 0; for _, list in pairs(TheApp.world.objects) do for _, o in ipairs(list) do if o.object_type.id == "reception_desk" then n = n + 1 end end end; rawset(_G, "auto_desks", n); return n
 expect rawget(_G, "auto_desks") >= 1

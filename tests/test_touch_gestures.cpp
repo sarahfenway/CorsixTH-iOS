@@ -426,62 +426,84 @@ int main() {
     }
   }
 
-  // Placing things (aim offset on): a tap places right where it lands; a drag
-  // aims the item above the finger, so it isn't hidden, and lifting drops it
-  // there; a long press is still a right click where it lands (picks an item
-  // up); the aim stays on screen.
+  // Placing things (trackpad in pointer mode): a drag moves the item like
+  // the cursor, so the finger never hides it; a tap moves it to the finger;
+  // nothing is placed on lift (the native Place button does that); a long
+  // press right-clicks under the finger (picks a placed item up).
+  auto placing = [] {
+    trackpad_recogniser t;
+    t.set_bounds(1000, 480);  // cursor starts at (500, 240)
+    t.set_pointer_mode(true);
+    return t;
+  };
   {
-    gesture_recogniser g;
-    g.set_aim_offset(40);
+    auto g = placing();
     std::vector<mouse_action> out;
-    g.finger_down(1, 100, 200, 1000, out);
-    g.finger_up(1, 102, 201, 1080, out);
-    expect("placing: a tap places where it lands", out,
-           "move(100,200) press1(100,200) release1(100,200) ");
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_up(1, 101, 101, 1080, out);
+    expect("placing: a tap moves the pointer to the finger, no click", out,
+           "move(500,240) move(101,101) ");
   }
   {
-    gesture_recogniser g;
-    g.set_aim_offset(40);
+    auto g = placing();
     std::vector<mouse_action> out;
-    g.finger_down(1, 100, 200, 1000, out);
-    g.finger_move(1, 130, 200, 1040, out);
-    g.finger_move(1, 160, 210, 1300, out);  // a slow drag: still aiming
-    g.finger_up(1, 160, 210, 1400, out);
-    expect("placing: a drag aims above the finger and lifting drops it", out,
-           "move(100,200) move(130,160) move(160,170) move(160,170) "
-           "press1(160,170) release1(160,170) ");
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_move(1, 105, 100, 1016, out);
+    g.finger_move(1, 110, 105, 1032, out);
+    g.finger_move(1, 115, 105, 1048, out);
+    g.finger_move(1, 120, 110, 1064, out);
+    g.finger_up(1, 120, 110, 1300, out);
+    expect("placing: a drag moves the pointer as the finger moves; lifting doesn't click", out,
+           "move(500,240) move(510,245) move(515,245) move(521,251) ");
   }
   {
-    gesture_recogniser g;
-    g.set_aim_offset(40);
+    auto g = placing();
     std::vector<mouse_action> out;
-    g.finger_down(1, 100, 200, 1000, out);
+    g.finger_down(1, 100, 100, 1000, out);
+    g.tick(1300, out);  // not yet
     g.tick(1600, out);
-    g.finger_up(1, 100, 200, 1700, out);
-    expect("placing: a long press right-clicks where it lands", out,
-           "move(100,200) press3(100,200) release3(100,200) ");
+    g.finger_move(1, 105, 100, 1616, out);
+    g.finger_move(1, 110, 100, 1632, out);
+    g.finger_up(1, 110, 100, 1700, out);
+    expect("placing: a long press right-clicks under the finger; a drag then moves on", out,
+           "move(500,240) move(100,100) press3(100,100) release3(100,100) "
+           "move(105,100) move(111,100) ");
   }
   {
-    gesture_recogniser g;
-    g.set_aim_offset(40);
+    auto g = placing();
     std::vector<mouse_action> out;
-    g.finger_down(1, 100, 20, 1000, out);
-    g.finger_move(1, 100, 50, 1040, out);
-    g.finger_up(1, 100, 50, 1100, out);
-    expect("placing: the aim stays on screen near the top", out,
-           "move(100,20) move(100,10) move(100,10) press1(100,10) "
-           "release1(100,10) ");
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_up(1, 100, 100, 1080, out);
+    g.finger_down(1, 300, 300, 1200, out);
+    g.finger_move(1, 305, 300, 1216, out);
+    g.finger_move(1, 310, 300, 1232, out);
+    g.finger_up(1, 310, 300, 1300, out);
+    expect("placing: tap then drag doesn't hold the button", out,
+           "move(500,240) move(100,100) move(110,100) ");
   }
   {
-    gesture_recogniser g;
-    g.set_aim_offset(40);
-    g.set_aim_offset(0);  // Placing over: back to the usual direct touches.
+    auto g = placing();
     std::vector<mouse_action> out;
     g.finger_down(1, 100, 200, 1000, out);
-    g.finger_move(1, 130, 200, 1040, out);
+    g.finger_down(2, 200, 200, 1010, out);
+    for (int step = 1; step <= 3; ++step) {
+      g.finger_move(1, 100 + 10 * step, 200, 1000 + 30 * step, out);
+      g.finger_move(2, 200 + 10 * step, 200, 1000 + 30 * step, out);
+    }
     g.finger_up(1, 130, 200, 1100, out);
-    expect("placing off: a quick swipe only moves the pointer again", out,
-           "move(100,200) move(130,200) move(130,200) ");
+    g.finger_up(2, 230, 200, 1100, out);
+    expect("placing: two fingers still pan the map", out,
+           "move(500,240) press2(500,240) pan(10,0) pan(5,0) pan(5,0) pan(5,0) pan(5,0) "
+           "release2(500,240) ");
+  }
+  {
+    auto g = placing();
+    g.set_pointer_mode(false);  // Placing over: taps click again.
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_up(1, 100, 100, 1080, out);
+    expect("placing off: a tap clicks at the cursor again", out,
+           "move(500,240) press1(500,240) release1(500,240) ");
   }
 
   // A two-finger pan where the fingers drift a little closer and further
