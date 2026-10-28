@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Theme Hospital</string>
+	<key>CFBundleExecutable</key>
+	<string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+	<key>CFBundleIdentifier</key>
+	<string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+	<key>CFBundleVersion</key>
+	<string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<!-- An empty launch screen: without one iOS runs the app in a small
+	     letterboxed compatibility mode. -->
+	<key>UILaunchScreen</key>
+	<dict/>
+	<!-- Recent iOS SDKs require the UIScene life cycle. SDL's app delegate
+	     (patched by tools/sdl2_uiscene_edit.py) is also the scene delegate. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>SDL</string>
+					<key>UISceneDelegateClassName</key>
+					<string>SDLUIKitDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Saves, screenshots and config.txt show up in the Files app and in
+	     Finder when the phone is plugged in. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<!-- Lets an iPad trackpad or mouse act as a real mouse (with right click). -->
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<!-- Shows the app's iCloud Drive folder (save games, logs) in the Files
+	     app and Finder as "Theme Hospital". -->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.${MACOSX_BUNDLE_GUI_IDENTIFIER}</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Theme Hospital</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>
