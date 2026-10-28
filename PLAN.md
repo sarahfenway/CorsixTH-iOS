@@ -9,13 +9,17 @@ Read `CLAUDE.md` first for the layout, build commands and rules.
 - The SDL2 UIScene backport works (without it the app is refused at launch).
 - Trackpad touch controls work.
 
-**Written but never run (check these first):**
-- iCloud Drive saves (`ios_platform.mm`, entitlements, `NSUbiquitousContainers`) and copying older
-  local saves into iCloud.
-- Saving `Resume.sav` when the app goes into the background, and resuming from it on launch.
+**Verified in the simulator (Phase 0 automation, `build-ios.sh --run tests/automation`):**
+- Saving from the save window: tapping the name box brings up the on-screen keyboard, the save
+  lands in `Documents/CorsixTH/Saves`, and loading it restores the game.
+- Going into the background writes `Resume.sav`; a cold relaunch continues that game; quitting to
+  the main menu removes it.
 - Console redirected to `Logs/console.txt`.
-- On-screen keyboard for text boxes (save names, hospital name).
-- Pinch zoom and two-finger pan on a real multi-touch screen.
+- Two-finger pan, pinch zoom (in and out; fixed: slow pinches used to be ignored) and trackpad
+  cursor movement, with injected multi-touch events.
+
+**Still to check on a device:** iCloud Drive saves and copying older local saves into iCloud (the
+simulator isn't signed in to iCloud); everything above on real hardware.
 
 **Known gaps:**
 - No music: iOS has no MIDI synthesiser, and Theme Hospital's soundtrack is MIDI (XMI).
@@ -23,9 +27,11 @@ Read `CLAUDE.md` first for the layout, build commands and rules.
 - The game draws under the notch/Dynamic Island and home indicator.
 - The logical resolution is fixed at launch, so folding/unfolding and iPad multitasking aren't handled.
 
-**Open bug from Sarah:** saving never seemed to stick. The likely causes are an unwritable save
-folder (CorsixTH then silently falls back to `os.tmpname()`, which iOS forbids) or the keyboard not
-appearing. The iCloud and resume work is meant to fix it. Confirm it from `console.txt`.
+**Open bug from Sarah:** saving never seemed to stick. On the iPhone Duo (build from 27 Oct)
+`Documents/CorsixTH/Saves` is empty and config.txt has the default save folder, so no save ever
+completed; that build had no console log, so the cause wasn't recorded. The same flow works in the
+simulator with the current build. Next: install the current build on the phone, try File > Save,
+and read `Logs/console.txt` (iCloud Drive or Documents) if it still fails.
 
 **Goal:** an app that feels native on iPhone and iPad, while the hospital itself keeps the original
 artwork. The UI is CorsixTH's own Lua code (it only draws TH sprites), so it can be changed or
@@ -34,6 +40,9 @@ replaced freely.
 ---
 
 ## Phase 0: simulator workflow and test harness (do this first)
+
+**Status (28 Oct 2026):** steps 1–4 done in the simulator; the device re-run and step 5 (optional
+desktop build) are still open. Harness command list: `src/touch_automation.h`.
 
 1. **Put the project under git.** It isn't a repo yet. Commit everything except the gitignored
    paths (`deps/`, `build-ios/`, `ThemeHospital/`, `Music/`).
