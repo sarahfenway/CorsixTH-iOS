@@ -14,12 +14,15 @@ screenshot 1_catalog
 lua local n, total = 0, 0; for _, r in ipairs(TheApp.native:roomList()) do total = total + 1; if r.image and lfs.attributes(r.image, "size") then n = n + 1 end end; rawset(_G, "auto_pics", n == total and total > 0); return n .. " of " .. total
 expect rawget(_G, "auto_pics")
 expect TheApp.world:getCurrentSpeed() ~= "Pause"
-# Other rooms still go through CorsixTH's own editor.
+# "By Hand" hands the proposal to CorsixTH's own (visible) editor.
 lua require("sdl").native.post("pick_room", '{"id":"psych"}')
-wait_until 3000 TheApp.ui:getWindow(UIEditRoom) ~= nil
-expect TheApp.ui:getWindow(UIEditRoom).visible ~= false
-expect TheApp.native.quick_build == nil
+wait_until 3000 TheApp.native.quick_build ~= nil
 expect require("sdl").native.screen() == nil
+lua require("sdl").native.post("quick_build_by_hand")
+wait_until 3000 TheApp.native.quick_build == nil
+expect TheApp.ui:getWindow(UIEditRoom) ~= nil
+expect TheApp.ui:getWindow(UIEditRoom).visible ~= false
+expect TheApp.ui:getWindow(UIEditRoom).phase == "walls"
 lua TheApp.ui:getWindow(UIEditRoom):cancel()
 wait 300
 expect TheApp.ui:getWindow(UIEditRoom) == nil

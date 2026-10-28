@@ -48,13 +48,12 @@ function planner.rectOk(app, x, y, w, h, player_id)
 end
 
 --! Finds a free outline for the room as close as possible to tile (cx, cy).
--- A size one bigger than the minimum is preferred (room to move the
--- furniture), then the minimum, then two bigger.
+-- One size bigger than the minimum is preferred anywhere in range (at the
+-- minimum, the furniture may not all fit), then the minimum, then two bigger.
 function planner.findRect(app, room_type, cx, cy, player_id)
   local min = room_type.minimum_size or 3
-  local sizes = { min + 1, min, min + 2 }
-  for radius = 0, 20 do
-    for _, size in ipairs(sizes) do
+  for _, size in ipairs({ min + 1, min, min + 2 }) do
+    for radius = 0, 20 do
       local x0 = cx - math.floor(size / 2)
       local y0 = cy - math.floor(size / 2)
       -- The ring of positions at this distance (Chebyshev) from the centre.

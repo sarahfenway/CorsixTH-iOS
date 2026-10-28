@@ -657,9 +657,6 @@ struct RoomCard: View {
           .minimumScaleFactor(0.8)
           .multilineTextAlignment(.center)
         HStack(spacing: 4) {
-          if room.quick {
-            Image(systemName: "bolt.fill").foregroundStyle(.tint)
-          }
           Text(room.cost).monospacedDigit()
             .foregroundStyle(room.affordable ? Color.secondary : Color.red)
         }
@@ -670,22 +667,11 @@ struct RoomCard: View {
       .background(
         RoundedRectangle(cornerRadius: 14, style: .continuous)
           .fill(Color(uiColor: .secondarySystemBackground)))
-      .overlay(alignment: .topTrailing) {
-        if room.quick {
-          Text("Quick")
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.accentColor))
-            .foregroundStyle(.white)
-            .padding(6)
-        }
-      }
       .opacity(room.affordable ? 1 : 0.5)
     }
     .buttonStyle(.plain)
     .disabled(!room.affordable)
-    .accessibilityLabel(room.quick ? "\(room.name), Quick Build, \(room.cost)" : "\(room.name), \(room.cost)")
+    .accessibilityLabel("\(room.name), \(room.cost)")
   }
 }
 

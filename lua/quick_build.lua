@@ -239,15 +239,31 @@ function QuickBuild:placeObjects()
     { id = "chair", score = far_from_door(rect, self.door) },
     { id = "cabinet", score = against_wall(rect) },
   }
-  -- Anything else the room needs goes anywhere it fits.
+  -- Anything else the room needs goes against a wall, biggest first so the
+  -- small things fit around it.
+  local others = {}
   for id in pairs(self.room_type.objects_needed) do
     local known = false
     for _, p in ipairs(preferences) do
       if p.id == id then known = true end
     end
     if not known then
-      preferences[#preferences + 1] = { id = id, score = against_wall(rect) }
+      others[#others + 1] = id
     end
+  end
+  local function footprint_size(id)
+    local object = TheApp.objects[id]
+    local orientation = object and object.orientations and object.orientations.north
+    return orientation and #orientation.footprint or 1
+  end
+  table.sort(others, function(a, b)
+    if footprint_size(a) ~= footprint_size(b) then
+      return footprint_size(a) > footprint_size(b)
+    end
+    return a < b
+  end)
+  for _, id in ipairs(others) do
+    preferences[#preferences + 1] = { id = id, score = against_wall(rect) }
   end
 
   local tiles = {}

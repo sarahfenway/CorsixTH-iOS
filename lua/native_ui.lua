@@ -55,8 +55,16 @@ local replaced_windows = {
 -- Native screens that leave the game running (they don't cover the map).
 local unpaused_screens = { main_menu = true, room_catalog = true }
 
--- Rooms that can be built with Quick Build (lua/quick_build.lua), by id.
-local quick_build_rooms = { gp = true }
+-- Rooms that can be built with Quick Build (lua/quick_build.lua), by id: every
+-- Theme Hospital room, each checked by tests/automation/09_quick_build_all.txt.
+-- Others (e.g. from mods) use CorsixTH's own editor.
+local quick_build_rooms = {}
+for _, id in ipairs({ "blood_machine", "cardiogram", "decontamination", "dna_fixer",
+    "electrolysis", "fracture_clinic", "general_diag", "gp", "hair_restoration", "inflation",
+    "jelly_vat", "operating_theatre", "pharmacy", "psych", "research", "scanner",
+    "slack_tongue", "staff_room", "toilets", "training", "ultrascan", "ward", "x_ray" }) do
+  quick_build_rooms[id] = true
+end
 
 local room_categories = {
   { id = "diagnosis", title = "Diagnosis" },

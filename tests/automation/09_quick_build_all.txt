@@ -1,0 +1,260 @@
+# Quick Build every room type on a fresh level 12 (which has every room) and report each; fails if
+# any room can't be built. (Test set-up only: rooms marked as discovered and
+# plenty of money, so every room can be tried.)
+wait_until 30000 TheApp.ui ~= nil
+lua rawset(_G, "auto_results", {})
+log ---- blood_machine
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"blood_machine"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "blood_machine" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "blood_machine", ok and "" or why); return results[#results]
+screenshot blood_machine
+log ---- cardiogram
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"cardiogram"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "cardiogram" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "cardiogram", ok and "" or why); return results[#results]
+screenshot cardiogram
+log ---- decontamination
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"decontamination"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "decontamination" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "decontamination", ok and "" or why); return results[#results]
+screenshot decontamination
+log ---- dna_fixer
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"dna_fixer"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "dna_fixer" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "dna_fixer", ok and "" or why); return results[#results]
+screenshot dna_fixer
+log ---- electrolysis
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"electrolysis"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "electrolysis" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "electrolysis", ok and "" or why); return results[#results]
+screenshot electrolysis
+log ---- fracture_clinic
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"fracture_clinic"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "fracture_clinic" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "fracture_clinic", ok and "" or why); return results[#results]
+screenshot fracture_clinic
+log ---- general_diag
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"general_diag"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "general_diag" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "general_diag", ok and "" or why); return results[#results]
+screenshot general_diag
+log ---- gp
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "gp" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "gp", ok and "" or why); return results[#results]
+screenshot gp
+log ---- hair_restoration
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"hair_restoration"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "hair_restoration" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "hair_restoration", ok and "" or why); return results[#results]
+screenshot hair_restoration
+log ---- inflation
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"inflation"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "inflation" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "inflation", ok and "" or why); return results[#results]
+screenshot inflation
+log ---- jelly_vat
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"jelly_vat"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "jelly_vat" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "jelly_vat", ok and "" or why); return results[#results]
+screenshot jelly_vat
+log ---- operating_theatre
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"operating_theatre"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "operating_theatre" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "operating_theatre", ok and "" or why); return results[#results]
+screenshot operating_theatre
+log ---- pharmacy
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"pharmacy"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "pharmacy" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "pharmacy", ok and "" or why); return results[#results]
+screenshot pharmacy
+log ---- psych
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"psych"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "psych" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "psych", ok and "" or why); return results[#results]
+screenshot psych
+log ---- research
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"research"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "research" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "research", ok and "" or why); return results[#results]
+screenshot research
+log ---- scanner
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"scanner"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "scanner" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "scanner", ok and "" or why); return results[#results]
+screenshot scanner
+log ---- slack_tongue
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"slack_tongue"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "slack_tongue" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "slack_tongue", ok and "" or why); return results[#results]
+screenshot slack_tongue
+log ---- staff_room
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"staff_room"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "staff_room" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "staff_room", ok and "" or why); return results[#results]
+screenshot staff_room
+log ---- toilets
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"toilets"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "toilets" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "toilets", ok and "" or why); return results[#results]
+screenshot toilets
+log ---- training
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"training"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "training" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "training", ok and "" or why); return results[#results]
+screenshot training
+log ---- ultrascan
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"ultrascan"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "ultrascan" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "ultrascan", ok and "" or why); return results[#results]
+screenshot ultrascan
+log ---- ward
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"ward"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "ward" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "ward", ok and "" or why); return results[#results]
+screenshot ward
+log ---- x_ray
+lua TheApp:loadLevel(12, "full")
+wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
+lua TheApp.ui:getWindow(UIInformation):close(); local h = TheApp.ui.hospital; h.balance = 1000000; for _, d in pairs(h.room_discoveries) do d.is_discovered = true end
+lua require("sdl").native.post("pick_room", '{"id":"x_ray"}')
+wait 500
+lua local qb = TheApp.native.quick_build; if qb then rawset(_G, "auto_rect", ("%dx%d"):format(qb.rect.w, qb.rect.h)); qb:build() else rawset(_G, "auto_rect", "no proposal") end
+wait_until 30000 TheApp.native.quick_build == nil
+wait 300
+lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "x_ray" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "x_ray", ok and "" or why); return results[#results]
+screenshot x_ray
+lua local bad = 0; for _, line in ipairs(rawget(_G, "auto_results")) do print(line); if line:sub(1, 4) == "FAIL" then bad = bad + 1 end end; rawset(_G, "auto_bad", bad); return bad .. " of " .. #rawget(_G, "auto_results") .. " failed"
+expect rawget(_G, "auto_bad") == 0
