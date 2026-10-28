@@ -753,7 +753,7 @@ struct HireStaffView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
               ForEach(candidates) { candidate in
-                CandidateCard(category: category, candidate: candidate)
+                CandidateCard(category: category, candidate: candidate, abacus: hire.abacus, computer: hire.computer)
               }
             }
             .padding(.horizontal, 12)
@@ -769,11 +769,23 @@ struct CandidateCard: View {
   let category: String
   let candidate: Candidate
 
-  private var qualifications: [String] {
-    var list: [String] = []
-    if candidate.surgeon { list.append("Surgeon") }
-    if candidate.psychiatrist { list.append("Psychiatrist") }
-    if candidate.researcher { list.append("Researcher") }
+  var abacus: String? = nil
+  var computer: String? = nil
+
+  private struct Qualification: Hashable {
+    var title: String
+    var icon: String?
+  }
+
+  private var qualifications: [Qualification] {
+    var list: [Qualification] = []
+    if candidate.surgeon { list.append(Qualification(title: "Surgeon", icon: candidate.surgeonIcon)) }
+    if candidate.psychiatrist {
+      list.append(Qualification(title: "Psychiatrist", icon: candidate.psychiatristIcon))
+    }
+    if candidate.researcher {
+      list.append(Qualification(title: "Researcher", icon: candidate.researcherIcon))
+    }
     return list
   }
 
@@ -785,20 +797,41 @@ struct CandidateCard: View {
           .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         VStack(alignment: .leading, spacing: 4) {
           Text(candidate.displayName).font(.headline)
-          HStack(spacing: 6) {
-            if let rank = candidate.rank { Text(rank) }
-            ForEach(qualifications, id: \.self) { Text($0).foregroundStyle(.tint) }
+          if let rank = candidate.rank {
+            Text(rank).font(.caption.weight(.semibold))
           }
-          .font(.caption.weight(.semibold))
+          if !qualifications.isEmpty {
+            HStack(spacing: 10) {
+              ForEach(qualifications, id: \.self) { q in
+                Group {
+                  if q.icon != nil {
+                    GamePicture(path: q.icon).frame(width: 28, height: 28)
+                  } else {
+                    Text(q.title).font(.caption.weight(.semibold)).foregroundStyle(.tint)
+                  }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(q.title)
+              }
+            }
+          }
           HStack(spacing: 6) {
-            Text("Skill").font(.caption).foregroundStyle(.secondary)
+            if abacus != nil {
+              GamePicture(path: abacus).frame(width: 22, height: 22)
+            } else {
+              Text("Skill").font(.caption).foregroundStyle(.secondary)
+            }
             ProgressView(value: candidate.skill)
               .tint(candidate.skill < 0.35 ? .orange : .green)
+              .accessibilityLabel("Skill")
+            if computer != nil {
+              GamePicture(path: computer).frame(width: 22, height: 22)
+            }
           }
           Text(candidate.wage)
-            .font(.caption)
+            .font(.title3.bold())
             .monospacedDigit()
-            .foregroundStyle(candidate.affordable ? Color.secondary : Color.red)
+            .foregroundStyle(candidate.affordable ? Color.primary : Color.red)
         }
       }
       if !candidate.description.isEmpty {

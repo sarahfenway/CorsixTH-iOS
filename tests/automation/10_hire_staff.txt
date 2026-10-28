@@ -5,6 +5,8 @@ lua TheApp:loadLevel(1, "easy")
 wait_until 30000 TheApp.world ~= nil
 wait 1000
 lua TheApp.ui:getWindow(UIInformation):close()
+# (Test set-up: the first doctor gets every qualification, to show their icons.)
+lua local d = TheApp.world.available_staff.Doctor[1]; d.is_surgeon = 1.0; d.is_psychiatrist = 1.0; d.is_researcher = 1.0
 native_tap Hire Staff
 wait_until 3000 require("sdl").native.screen() == "hire_staff"
 expect TheApp.ui:getWindow(UIHireStaff) == nil
@@ -13,6 +15,9 @@ wait 1000
 screenshot 1_hire_panel
 lua local s = TheApp.native:state().hire; local n, faces = 0, 0; for _, list in pairs(s.candidates) do for _, c in ipairs(list) do n = n + 1; if c.face and lfs.attributes(c.face, "size") then faces = faces + 1 end end end; rawset(_G, "auto_faces", n > 0 and n == faces); return faces .. " faces for " .. n .. " candidates"
 expect rawget(_G, "auto_faces")
+# The game's own icons: qualifications, and the skill bar's abacus and computer.
+lua local s = TheApp.native:state().hire; local d = s.candidates.Doctor[1]; local ok = true; for _, p in ipairs({s.abacus, s.computer, d.surgeon_icon, d.psychiatrist_icon, d.researcher_icon}) do ok = ok and lfs.attributes(p or "", "size") ~= nil end; rawset(_G, "auto_icons", ok); return tostring(ok)
+expect rawget(_G, "auto_icons")
 # Hire the first doctor: placed straight away, in the corridor.
 lua rawset(_G, "auto_staff", #TheApp.ui.hospital.staff); rawset(_G, "auto_pool", #TheApp.world.available_staff.Doctor); rawset(_G, "auto_name", corsixth.require("ios.json").text(TheApp.world.available_staff.Doctor[1]:getFullName())); return auto_name
 lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_name") .. '"}')

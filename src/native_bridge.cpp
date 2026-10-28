@@ -178,10 +178,11 @@ int l_tap(lua_State* L) {
   return 1;
 }
 
-// renderToPNG(path, width, height, draw) points the game's renderer at an
-// offscreen picture of that size, calls draw() (which draws with the game's
+// renderToPNG(path, width, height, draw[, key]) points the game's renderer at
+// an offscreen picture of that size, calls draw() (which draws with the game's
 // own code, e.g. an animation onto TheApp.video at picture coordinates), and
 // saves the drawn part (empty borders trimmed) as a PNG with transparency.
+// key, a list of {r, g, b}, makes those colours see-through.
 // Used to show the game's art
 // in native menus. Returns true or nil, error.
 int l_render_to_png(lua_State* L) {
@@ -232,6 +233,26 @@ int l_render_to_png(lua_State* L) {
     lua_pushnil(L);
     lua_pushstring(L, SDL_GetError());
     return 2;
+  }
+  // Colours to make see-through (a sprite's own background), if given as
+  // {{r, g, b}, ...}.
+  if (lua_istable(L, 5)) {
+    lua_Integer keys = luaL_len(L, 5);
+    for (lua_Integer k = 1; k <= keys; ++k) {
+      lua_rawgeti(L, 5, k);
+      unsigned char rgb[3] = {0, 0, 0};
+      for (int c = 0; c < 3; ++c) {
+        lua_rawgeti(L, -1, c + 1);
+        rgb[c] = static_cast<unsigned char>(lua_tointeger(L, -1));
+        lua_pop(L, 1);
+      }
+      lua_pop(L, 1);
+      for (size_t i = 0; i < pixels.size(); i += 4) {
+        if (pixels[i] == rgb[0] && pixels[i + 1] == rgb[1] && pixels[i + 2] == rgb[2]) {
+          pixels[i + 3] = 0;
+        }
+      }
+    }
   }
   // Trim to the pixels that were drawn, keeping a one pixel margin.
   int min_x = width;

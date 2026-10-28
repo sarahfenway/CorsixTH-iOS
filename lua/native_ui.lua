@@ -472,6 +472,12 @@ end
 
 -- Pictures from the game's sprite sheets: {sheet folder, sheet, sprite, crop}.
 -- The crop (x, y, w, h) is the part of the sprite to keep.
+-- The hire window's background blues: the icons below sit on them, and
+-- shades show through the abacus's frame and under the computer.
+local panel_blue = { { 61, 174, 202 }, { 45, 146, 186 }, { 49, 154, 190 }, { 57, 166, 198 },
+  { 36, 138, 178 }, { 69, 182, 206 }, { 28, 121, 170 }, { 0, 77, 113 }, { 0, 65, 109 },
+  { 0, 93, 121 }, { 32, 130, 174 } }
+
 local sprites = {
   -- Bottom panel buttons (UIBottomPanel:drawPanels), the face of each button.
   bank = { "Data", "Panel02V", 1, { 6, 6, 35, 36 } },
@@ -486,6 +492,14 @@ local sprites = {
   status = { "Data", "Panel02V", 23, { 1, 6, 35, 36 } },
   charts = { "Data", "Panel02V", 25, { 1, 6, 35, 36 } },
   policy = { "Data", "Panel02V", 27, { 1, 6, 35, 36 } },
+  -- The hire window (UIHireStaff, QData/Req11V): a doctor's qualifications,
+  -- and the abacus and computer at the ends of the skill bar (on the panel's
+  -- blue, which is keyed out).
+  surgeon = { "QData", "Req11V", 292, nil, panel_blue, 3 },
+  psychiatrist = { "QData", "Req11V", 293, nil, panel_blue, 3 },
+  researcher = { "QData", "Req11V", 294, nil, panel_blue, 3 },
+  abacus = { "QData", "Req11V", 259, { 0, 4, 16, 17 }, panel_blue, 4 },
+  computer = { "QData", "Req11V", 259, { 66, 2, 17, 21 }, panel_blue, 4 },
 }
 
 --! A picture of one of the game's sprites (see `sprites`). Returns the PNG's
@@ -499,14 +513,16 @@ function NativeUI:spritePicture(name)
     return self.pictures[name] or nil
   end
   local info = sprites[name]
-  local path = info and self:pictureDir() .. ("sprite_%s_v2.png"):format(name)
+  -- info[6], if given, is the picture's own version (bump it when changing it).
+  local path = info and self:pictureDir() .. ("sprite_%s_v%d.png"):format(name, info[6] or 2)
   if path and not lfs.attributes(path, "size") then
     local ok, err = pcall(function()
       local sheet = self.app.gfx:loadSpriteTable(info[1], info[2], true)
-      local crop = info[4]
+      -- The whole sprite unless a crop ({x, y, w, h}) is given.
+      local crop = info[4] or { 0, 0, sheet:size(info[3]) }
       local done, why = SDL.native.renderToPNG(path, crop[3], crop[4], function()
         sheet:draw(self.app.video, info[3], -crop[1], -crop[2])
-      end)
+      end, info[5])
       if not done then error(why) end
     end)
     if not ok then
@@ -560,7 +576,7 @@ function NativeUI:hireState()
         index = index,
         name = json.text(profile:getFullName()),
         display_name = title_case(json.text(profile:getFullName())),
-        wage = NativeUI.formatMoney(profile.wage) .. " a month",
+        wage = NativeUI.formatMoney(profile.wage), -- A month.
         affordable = hospital.balance >= profile.wage,
         skill = profile.skill,
         rank = rank,
@@ -570,11 +586,18 @@ function NativeUI:hireState()
         description = profile.desc and json.text(profile.desc) or "",
         face = self:facePicture(profile),
       }
+      if category.id == "Doctor" then
+        local item = list[#list]
+        item.surgeon_icon = item.surgeon and self:spritePicture("surgeon") or nil
+        item.psychiatrist_icon = item.psychiatrist and self:spritePicture("psychiatrist") or nil
+        item.researcher_icon = item.researcher and self:spritePicture("researcher") or nil
+      end
     end
     categories[#categories + 1] = { id = category.id, title = category.title }
     candidates[category.id] = list
   end
-  return { categories = categories, candidates = candidates }
+  return { categories = categories, candidates = candidates,
+    abacus = self:spritePicture("abacus"), computer = self:spritePicture("computer") }
 end
 
 --! Puts a newly hired person (in a UIPlaceStaff that's waiting for a click)

@@ -524,6 +524,8 @@ struct RoomOption: Codable, Hashable, Identifiable {
 struct HireState: Codable, Hashable {
   var categories: [NamedOption]
   var candidates: [String: [Candidate]]
+  var abacus: String?  // The ends of the game's skill bar.
+  var computer: String?
 }
 
 struct Candidate: Codable, Hashable, Identifiable {
@@ -539,6 +541,9 @@ struct Candidate: Codable, Hashable, Identifiable {
   var researcher: Bool
   var description: String
   var face: String?
+  var surgeonIcon: String?  // The game's qualification icons (doctors).
+  var psychiatristIcon: String?
+  var researcherIcon: String?
   var id: String { "\(index) \(name)" }
 }
 
