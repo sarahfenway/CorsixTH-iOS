@@ -27,6 +27,7 @@ SOFTWARE. --]]
 
 local json = corsixth.require("ios.json")
 local QuickBuild = corsixth.require("ios.quick_build")
+local editing = corsixth.require("ios.room_editor")
 local SDL = require("sdl")
 local TH = require("TH")
 local pathsep = package.config:sub(1, 1)
@@ -173,13 +174,57 @@ function NativeUI:message(text)
   SDL.native.show("alert", json.encode({ message = text }))
 end
 
---! Ends a Quick Build in progress (a game is being loaded or left).
+--! Ends a Quick Build or editing session in progress (a game is being
+-- loaded or left).
 function NativeUI:endQuickBuild()
   if self.quick_build then
     self.quick_build:cancel()
     self.quick_build = nil
   end
   SDL.native.setQuickBuild(nil)
+  if self.editor then
+    self.editor:finish()
+    self.editor = nil
+  end
+  self.pending_adoptions = nil
+end
+
+--! Hands newly opened editor windows to the native controls.
+function NativeUI:adoptWindows()
+  local pending = self.pending_adoptions
+  self.pending_adoptions = nil
+  for _, window in ipairs(pending or {}) do
+    local name = class.type(window)
+    local editor = self.editor
+    if window.closed then -- luacheck: ignore 542
+    elseif name == "UIEditRoom" then
+      if not (self.quick_build and self.quick_build.edit == window) then
+        if editor then editor:finish() end
+        if window.phase == "walls" then
+          self.editor = nil
+          self.quick_build = QuickBuild.adopt(self, window)
+        else
+          self.editor = editing.RoomEditor.adopt(self, window)
+        end
+      end
+    elseif name == "UIFurnishCorridor" then
+      if window.edit_dialog then
+        if editor and editor.edit == window.edit_dialog then
+          editor:adoptBuying(window)
+        end
+      else
+        if editor then editor:finish() end
+        self.editor = editing.Furnisher.adopt(self, window)
+      end
+    elseif name == "UIPlaceObjects" then
+      if editor and getmetatable(editor) == editing.Furnisher and not editor.finished then
+        editor:adoptPlacing(window)
+      else
+        if editor then editor:finish() end
+        self.editor = editing.Furnisher.adopt(self, window)
+      end
+    end
+  end
 end
 
 --! Closes the native screen and lets the game carry on.
@@ -215,6 +260,12 @@ function NativeUI:interceptWindow(ui, window)
       window.callback_ok()
     end
     return true
+  end
+  if name == "UIEditRoom" or name == "UIFurnishCorridor" or name == "UIPlaceObjects" then
+    -- Shown, but driven by native controls (lua/room_editor.lua) once open.
+    self.pending_adoptions = self.pending_adoptions or {}
+    self.pending_adoptions[#self.pending_adoptions + 1] = window
+    return false
   end
   local screen = replaced_windows[name]
   if screen == nil then
@@ -571,6 +622,31 @@ function NativeUI:placeStaff(placer)
   end
   return false
 end
+
+--! A picture of an item (as the game's buying window previews it). Returns
+-- the PNG's path, or nil.
+function NativeUI:objectPicture(object)
+  local anim_id = object and object.build_preview_animation
+  if not anim_id then
+    return nil
+  end
+  local path = self:pictureDir() .. ("object_%s_v1.png"):format(object.id)
+  if not lfs.attributes(path, "size") then
+    local anim = TH.animation()
+    anim:setAnimation(self.app.anims, anim_id)
+    -- UIFurnishCorridor draws it at (72, 57) in its preview box.
+    local ok, err = SDL.native.renderToPNG(path, 160, 130, function()
+      anim:draw(self.app.video, 80, 60)
+    end)
+    if not ok then
+      print("Native UI: couldn't make a picture of " .. object.id .. ": " .. tostring(err))
+      return nil
+    end
+  end
+  return path
+end
+
+--! The rooms the player can build now, as UIBuildRoom lists them.
 function NativeUI:roomList()
   local app = self.app
   local hospital = app.ui.hospital
@@ -696,6 +772,12 @@ end
 --! Called every game tick (GameUI:onTick).
 function NativeUI:onTick()
   self.tick_count = (self.tick_count or 0) + 1
+  if self.pending_adoptions then
+    self:adoptWindows()
+  end
+  if self.editor and self.editor:onTick() then
+    self.editor = nil
+  end
   if self.tick_count % 5 == 0 then
     self:updateToolbar(false)
     -- A game is running (resumed at launch, say), so the main menu is done.
@@ -713,6 +795,14 @@ function NativeUI:onTick()
     local edit = self.app.ui and self.app.ui:getWindow(UIEditRoom)
     if edit and edit.visible == false then
       edit.visible = true
+    end
+    -- Likewise windows moved off screen for native controls.
+    if not self.editor and self.app.ui then
+      for _, window in ipairs(self.app.ui.windows or {}) do
+        if window.x and window.x <= editing.OFFSCREEN / 2 then
+          editing.unhide(window)
+        end
+      end
     end
   end
 end
@@ -739,9 +829,46 @@ local tools = {
 }
 
 function actions.tool(self, p)
-  local panel = self.app.ui and self.app.ui.bottom_panel
+  local ui = self.app.ui
+  local panel = ui and ui.bottom_panel
   if panel and tools[p.id] then
     tools[p.id](panel)
+    if p.id == "edit" then
+      -- The game is now waiting for a room to be clicked: touch picks it.
+      if self.editor then
+        self.editor:finish()
+        self.editor = nil
+      end
+      if ui.edit_room == true then
+        self.editor = editing.RoomPicker.start(self)
+      end
+    end
+  end
+end
+
+function actions.editor_button(self, p)
+  if self.editor then self.editor:pressed(p.id) end
+end
+
+function actions.editor_marker(self, p)
+  if self.editor then self.editor:marker(p.id) end
+end
+
+function actions.editor_select(self, p)
+  if self.editor then self.editor:select(tonumber(p.index)) end
+end
+
+function actions.editor_buy(self, p)
+  if self.editor then self.editor:buy(tonumber(p.index), tonumber(p.delta) or 0) end
+end
+
+function actions.quick_build_customise(self)
+  local qb = self.quick_build
+  if not qb then return end
+  local edit, door = qb:customise()
+  if edit then
+    self.quick_build = nil
+    self.editor = editing.RoomEditor.adopt(self, edit, door)
   end
 end
 
@@ -841,12 +968,6 @@ function actions.quick_build_build(self)
   end
 end
 
-function actions.quick_build_by_hand(self)
-  if self.quick_build then
-    self.quick_build:byHand(nil)
-    self.quick_build = nil
-  end
-end
 
 function actions.quick_build_cancel(self)
   self:endQuickBuild()

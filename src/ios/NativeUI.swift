@@ -36,6 +36,11 @@ public func cthNativeSetQuickBuild(_ json: UnsafePointer<CChar>) {
   NativeUI.shared.setQuickBuild(json: String(cString: json))
 }
 
+@_cdecl("cth_native_set_editor")
+public func cthNativeSetEditor(_ json: UnsafePointer<CChar>) {
+  NativeUI.shared.setEditor(json: String(cString: json))
+}
+
 @_cdecl("cth_native_screen")
 public func cthNativeScreen() -> UnsafePointer<CChar>? {
   return NativeUI.shared.currentScreenCString()
@@ -58,6 +63,7 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
   private var panel: UIViewController?
   private var hostStyle = Style.sheet
   private var quickBuild: QuickBuildOverlay?
+  private var editor: EditorOverlay?
   private var toolbar: GameToolbar?
   private weak var textAlert: UIAlertController?
   private var screenCString: UnsafeMutablePointer<CChar>?
@@ -239,6 +245,27 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
       quickBuild = QuickBuildOverlay(in: view)
     }
     quickBuild?.update(state)
+  }
+
+  // MARK: Room editor / furnishing overlay
+
+  //! Shows the editor's bar, markers and tray with this state, or removes
+  //! them (empty json).
+  func setEditor(json: String) {
+    guard !json.isEmpty else {
+      editor?.remove()
+      editor = nil
+      return
+    }
+    do {
+      let state = try JSONDecoder().decode(EditorState.self, from: Data(json.utf8))
+      if editor == nil, let root = rootViewController() {
+        editor = EditorOverlay(in: root)
+      }
+      editor?.update(state)
+    } catch {
+      print("Native UI: can't read the editor state: \(error)")
+    }
   }
 
   private func showAlert(json: String) {

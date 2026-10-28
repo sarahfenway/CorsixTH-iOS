@@ -44,6 +44,7 @@ void cth_native_update(const char* json);
 void cth_native_dismiss();
 void cth_native_set_toolbar(const char* json);
 void cth_native_set_quick_build(const char* json);
+void cth_native_set_editor(const char* json);
 const char* cth_native_screen();
 bool cth_native_tap(const char* label);
 }
@@ -147,6 +148,18 @@ int l_set_quick_build(lua_State* L) {
   const char* json = luaL_optstring(L, 1, "");
 #if CTH_NATIVE_UI
   cth_native_set_quick_build(json);
+#else
+  (void)json;
+#endif
+  return 0;
+}
+
+// setEditor(json) shows the room editor / furnishing controls, (nil) removes
+// them (lua/room_editor.lua).
+int l_set_editor(lua_State* L) {
+  const char* json = luaL_optstring(L, 1, "");
+#if CTH_NATIVE_UI
+  cth_native_set_editor(json);
 #else
   (void)json;
 #endif
@@ -259,6 +272,18 @@ int l_render_to_png(lua_State* L) {
   return 1;
 }
 
+// setPlacementTouch(on): direct touches with a raised pointer while placing.
+int l_set_placement_touch(lua_State* L) {
+  touch_ui::set_placement_mode(lua_toboolean(L, 1) != 0);
+  return 0;
+}
+
+// placementOffset(): how far above the finger the pointer is, in game pixels.
+int l_placement_offset(lua_State* L) {
+  lua_pushnumber(L, touch_ui::placement_offset());
+  return 1;
+}
+
 int l_set_cursor_speed(lua_State* L) {
   touch_ui::set_cursor_speed(luaL_checknumber(L, 1));
   return 0;
@@ -270,10 +295,13 @@ constexpr luaL_Reg native_lib[] = {{"available", l_available},
                                    {"dismiss", l_dismiss},
                                    {"setToolbar", l_set_toolbar},
                                    {"setQuickBuild", l_set_quick_build},
+                                   {"setEditor", l_set_editor},
                                    {"screen", l_screen},
                                    {"post", l_post},
                                    {"tap", l_tap},
                                    {"renderToPNG", l_render_to_png},
+                                   {"setPlacementTouch", l_set_placement_touch},
+                                   {"placementOffset", l_placement_offset},
                                    {"setCursorSpeed", l_set_cursor_speed},
                                    {nullptr, nullptr}};
 

@@ -1,0 +1,118 @@
+# Native room editor: build a GP's office step by step (door, a window,
+# furniture, a bought plant placed by touch), edit it (move the plant), then
+# furnish a corridor (a reception desk placed by touch). The game's own
+# editor checks, places and charges for everything.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua rawset(_G, "auto_money", TheApp.ui.hospital.balance); return auto_money
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 500
+native_tap Customise
+wait_until 3000 TheApp.native.editor ~= nil
+expect TheApp.ui:getWindow(UIEditRoom).phase == "door"
+wait_until 1000 TheApp.ui:getWindow(UIEditRoom).blueprint_door.valid
+wait 800
+screenshot 1_door
+# Move the door to another wall the game accepts (as tapping its marker).
+lua local ed = TheApp.native.editor; local door = ed.edit.blueprint_door; local was = door.floor_x .. "," .. door.floor_y; local chosen; for _, m in ipairs(ed:markers()) do if not m.id:find("^" .. was .. ",") then ed:marker(m.id); if door.valid then chosen = m.id; break end end end; rawset(_G, "auto_door", chosen); return tostring(chosen)
+expect rawget(_G, "auto_door") ~= nil
+lua require("sdl").native.post("editor_marker", '{"id":"' .. rawget(_G, "auto_door") .. '"}')
+wait_until 1000 TheApp.ui:getWindow(UIEditRoom).blueprint_door.valid
+native_tap Next
+wait_until 3000 TheApp.ui:getWindow(UIEditRoom).phase == "windows"
+# A window: find a wall the game accepts, then remove and re-add it by marker.
+lua local ed = TheApp.native.editor; local edit = ed.edit; local chosen; for _, m in ipairs(ed:markers()) do local x, y, w = m.id:match("^(%d+),(%d+),(%a+)$"); ed:marker(m.id); if edit:windowAt(tonumber(x), tonumber(y), w) then chosen = m.id; break end end; rawset(_G, "auto_window", chosen); return tostring(chosen)
+expect rawget(_G, "auto_window") ~= nil
+lua require("sdl").native.post("editor_marker", '{"id":"' .. rawget(_G, "auto_window") .. '"}')
+wait 300
+lua local x, y, w = rawget(_G, "auto_window"):match("^(%d+),(%d+),(%a+)$"); return TheApp.ui:getWindow(UIEditRoom):windowAt(tonumber(x), tonumber(y), w)
+expect not TheApp.ui:getWindow(UIEditRoom):windowAt(rawget(_G, "auto_window"):match("^(%d+),(%d+),(%a+)$"))
+lua require("sdl").native.post("editor_marker", '{"id":"' .. rawget(_G, "auto_window") .. '"}')
+wait 300
+expect TheApp.ui:getWindow(UIEditRoom):windowAt(rawget(_G, "auto_window"):match("^(%d+),(%d+),(%a+)$"))
+screenshot 2_window
+native_tap Next
+wait_until 10000 TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+wait 800
+screenshot 3_furniture_tray
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 3
+native_tap Auto
+wait 300
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 0
+expect TheApp.ui:getWindow(UIEditRoom).confirm_button.enabled
+# Buy a plant with the tray's stepper (what it sends), then Buy.
+native_tap Extras
+wait_until 3000 TheApp.native.editor.buying ~= nil
+lua local b = TheApp.native.editor.buying; for i, o in ipairs(b.objects) do if o.object.id == "plant" then rawset(_G, "auto_plant", i) end end; return rawget(_G, "auto_plant")
+lua require("sdl").native.post("editor_buy", '{"index":' .. rawget(_G, "auto_plant") .. ',"delta":1}')
+wait 300
+expect TheApp.native.editor.buying.objects[rawget(_G, "auto_plant")].qty == 1
+screenshot 4_buy
+native_tap Buy
+wait_until 3000 TheApp.native.editor.buying == nil
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
+expect TheApp.ui:getWindow(UIEditRoom).objects[1].object.id == "plant"
+# Place it by touch: find a tile the game accepts, then tap there (the
+# pointer is raised above the finger, so tap that much lower).
+lua local edit = TheApp.ui:getWindow(UIEditRoom); local r = edit.blueprint_rect; edit.place_objects = true; edit:setActiveIndex(1); local spot; for y = r.y, r.y + r.h - 1 do for x = r.x, r.x + r.w - 1 do if not spot then edit:setBlueprintCell(x, y); if edit.object_blueprint_good then spot = {x, y} end end end end; rawset(_G, "auto_spot", spot); local sx, sy = TheApp.ui:WorldToScreen(spot[1] + 0.5, spot[2] + 0.5); rawset(_G, "auto_tap", {sx, sy + require("sdl").native.placementOffset()}); return ("%d,%d -> %.0f,%.0f"):format(spot[1], spot[2], sx, sy)
+tap_at rawget(_G, "auto_tap")
+wait 500
+lua local n = 0; for o in pairs(TheApp.ui:getWindow(UIEditRoom).room.objects) do if o.object_type.id == "plant" then n = n + 1 end end; return n
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 0
+screenshot 5_plant_placed
+native_tap Done
+wait_until 3000 TheApp.ui:getWindow(UIEditRoom) == nil
+wait 500
+expect TheApp.native.editor == nil
+lua local found; for _, room in pairs(TheApp.world.rooms) do if room.room_info.id == "gp" then found = room end end; rawset(_G, "auto_gp", found); local n = {}; for o in pairs(found.objects) do n[o.object_type.id] = (n[o.object_type.id] or 0) + 1 end; rawset(_G, "auto_objects", n); return ("built %s desk %s cabinet %s chair %s plant %s"):format(tostring(found.built), tostring(n.desk), tostring(n.cabinet), tostring(n.chair), tostring(n.plant))
+expect rawget(_G, "auto_gp").built and rawget(_G, "auto_objects").plant == 1 and rawget(_G, "auto_objects").desk == 1
+expect TheApp.ui.hospital.balance < rawget(_G, "auto_money")
+screenshot 6_built
+# Edit the room: pick it with a tap, then move the plant (long press picks it
+# up, a tap puts it down).
+lua TheApp.ui:getWindow(UIInformation):close()
+native_tap Edit Room
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui.edit_room == true
+lua local r = rawget(_G, "auto_gp"); local sx, sy = TheApp.ui:WorldToScreen(r.x + r.width / 2, r.y + r.height / 2); return {sx, sy + require("sdl").native.placementOffset()}
+tap_at (function() local r = rawget(_G, "auto_gp"); local sx, sy = TheApp.ui:WorldToScreen(r.x + r.width / 2, r.y + r.height / 2); return {sx, sy + require("sdl").native.placementOffset()} end)()
+wait_until 10000 TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
+wait 800
+screenshot 7_editing
+lua for o in pairs(rawget(_G, "auto_gp").objects) do if o.object_type.id == "plant" then rawset(_G, "auto_plant_obj", o) end end; local o = rawget(_G, "auto_plant_obj"); return o.tile_x .. "," .. o.tile_y
+long_press_at (function() local o = rawget(_G, "auto_plant_obj"); local sx, sy = TheApp.ui:WorldToScreen(o.tile_x + 0.5, o.tile_y + 0.5); return {sx, sy + require("sdl").native.placementOffset()} end)()
+wait 500
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 1
+lua local edit = TheApp.ui:getWindow(UIEditRoom); local r = edit.blueprint_rect; local old = rawget(_G, "auto_plant_obj"); local spot; for y = r.y + r.h - 1, r.y, -1 do for x = r.x + r.w - 1, r.x, -1 do if not spot and (x ~= old.tile_x or y ~= old.tile_y) then edit:setBlueprintCell(x, y); if edit.object_blueprint_good then spot = {x, y} end end end end; rawset(_G, "auto_spot2", spot); return spot[1] .. "," .. spot[2]
+tap_at (function() local s = rawget(_G, "auto_spot2"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {sx, sy + require("sdl").native.placementOffset()} end)()
+wait 500
+expect #TheApp.ui:getWindow(UIEditRoom).objects == 0
+native_tap Done
+wait_until 5000 TheApp.ui:getWindow(UIEditRoom) == nil
+lua local p; for o in pairs(rawget(_G, "auto_gp").objects) do if o.object_type.id == "plant" then p = o end end; rawset(_G, "auto_moved", p and p.tile_x == rawget(_G, "auto_spot2")[1] and p.tile_y == rawget(_G, "auto_spot2")[2]); return p and (p.tile_x .. "," .. p.tile_y) or "no plant"
+expect rawget(_G, "auto_moved")
+# Furnish a corridor: buy a reception desk, place it by touch.
+native_tap Furnish Corridor
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui:getWindow(UIFurnishCorridor) ~= nil
+wait 800
+screenshot 8_furnish
+lua local f = TheApp.ui:getWindow(UIFurnishCorridor); for i, o in ipairs(f.objects) do if o.object.id == "reception_desk" then rawset(_G, "auto_desk", i) end end; return rawget(_G, "auto_desk")
+lua require("sdl").native.post("editor_buy", '{"index":' .. rawget(_G, "auto_desk") .. ',"delta":1}')
+wait 300
+native_tap Buy
+wait_until 3000 TheApp.ui:getWindow(UIPlaceObjects) ~= nil and TheApp.native.editor ~= nil and TheApp.native.editor.placing
+wait 500
+lua local w = TheApp.ui:getWindow(UIPlaceObjects); w.place_objects = true; local cx, cy = TheApp.ui:ScreenToWorld(TheApp.config.width / 2, TheApp.config.height / 2); cx, cy = math.floor(cx), math.floor(cy); local spot; for r = 0, 15 do for dy = -r, r do for dx = -r, r do if not spot and math.max(math.abs(dx), math.abs(dy)) == r then w:setBlueprintCell(cx + dx, cy + dy); if w.object_blueprint_good then spot = {cx + dx, cy + dy} end end end end end; rawset(_G, "auto_spot3", spot); return spot and (spot[1] .. "," .. spot[2]) or "none"
+tap_at (function() local s = rawget(_G, "auto_spot3"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {sx, sy + require("sdl").native.placementOffset()} end)()
+wait 800
+lua local n = 0; for _, list in pairs(TheApp.world.objects) do for _, o in ipairs(list) do if o.object_type.id == "reception_desk" then n = n + 1 end end end; rawset(_G, "auto_desks", n); return n
+expect rawget(_G, "auto_desks") >= 1
+screenshot 9_desk_placed
+# With everything placed the game closes its placing window, and the native
+# controls go with it.
+wait_until 3000 TheApp.native.editor == nil
+expect TheApp.ui:getWindow(UIPlaceObjects) == nil

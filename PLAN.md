@@ -157,8 +157,9 @@ Quick Build is done in the simulator for all 23 rooms (spec and plan in `docs/su
 native room catalogue (side panel, room pictures from the game), proposed outline with finger
 handles over the engine's blueprint, built by driving the engine's own editor with only the
 required furniture. Next candidates: optional extras (radiators, plants, extra loos) and nicer
-furniture layouts per room, and moving furniture by finger. Native hire screen with automatic
-placement: done in the simulator (not yet: hiring straight into a room that needs that person).
+furniture layouts per room. Native hire screen with automatic placement: done in the simulator
+(not yet: hiring straight into a room that needs that person). Native room editor (door, windows,
+furniture, extras, editing built rooms) and corridor furnishing: done in the simulator.
 
 ## Phase 2: make the remaining original UI touch-friendly
 

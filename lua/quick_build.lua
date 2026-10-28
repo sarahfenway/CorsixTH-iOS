@@ -79,6 +79,27 @@ function QuickBuild.start(native, room_type)
   return self
 end
 
+--! Takes over a room editor that is back at the outline stage (the player
+-- went Back from the native room editor).
+function QuickBuild.adopt(native, edit)
+  local app = native.app
+  local self = setmetatable({}, QuickBuild)
+  self.native = native
+  self.app = app
+  self.ui = app.ui
+  self.room_type = edit.room_type
+  self.player = app.ui.hospital:getPlayerIndex()
+  local r = edit.blueprint_rect
+  self.rect = { x = r.x, y = r.y, w = r.w, h = r.h }
+  self.edit = edit
+  edit.visible = false
+  if edit.native_saved_x then
+    edit.x = edit.native_saved_x
+  end
+  self:sendOverlay(true)
+  return self
+end
+
 function QuickBuild:cost()
   local world = self.app.world
   if world.free_build_mode then return 0 end
@@ -175,14 +196,17 @@ function QuickBuild:drag(handle, lx, ly, ended)
   self:sendOverlay(false)
 end
 
---! Leaves the player in CorsixTH's own editor with the outline as it is.
+--! Stops building automatically: the native room editor (or, back at the
+-- outline, Quick Build's handles) takes over where things are.
 function QuickBuild:byHand(message)
   self.finished = true
-  self.edit.visible = true
   SDL.native.setQuickBuild(nil)
   if message then
     self.native:message(message)
   end
+  local native = self.native
+  native.pending_adoptions = native.pending_adoptions or {}
+  table.insert(native.pending_adoptions, self.edit)
 end
 
 function QuickBuild:cancel()
@@ -191,6 +215,35 @@ function QuickBuild:cancel()
   if not self.edit.closed and self.edit.phase == "walls" then
     self.edit:cancel()
   end
+end
+
+--! Goes on to the native room editor: the outline is confirmed (the editor
+-- checks it as for a click) and a door is suggested, which the player can
+-- move before carrying on.
+function QuickBuild:customise()
+  if self.building or not self:isValid() then
+    return
+  end
+  local edit = self.edit
+  SDL.native.setQuickBuild(nil)
+  edit:confirm()
+  if edit.phase ~= "door" then
+    -- Refused (it would cut off part of the hospital); the adviser has
+    -- said why. Stay on the outline.
+    self:sendOverlay(true)
+    return
+  end
+  self.finished = true
+  local centre_x, centre_y = self.ui:ScreenToWorld(self.app.config.width / 2,
+      self.app.config.height / 2)
+  for _, candidate in ipairs(planner.doorCandidates(self.app, self.rect,
+      math.floor(centre_x), math.floor(centre_y), self.player)) do
+    edit:setDoorBlueprint(candidate.x, candidate.y, candidate.wall)
+    if edit.blueprint_door.valid then
+      return edit, candidate
+    end
+  end
+  return edit, nil
 end
 
 --! Builds the room: the same steps as a player clicking through the editor.
@@ -231,41 +284,21 @@ function QuickBuild:build()
   self:onTick()
 end
 
--- Places each needed object where the editor accepts it.
-function QuickBuild:placeObjects()
-  local edit, world, rect = self.edit, self.app.world, self.rect
-  local preferences = {
-    { id = "desk", score = far_from_door(rect, self.door) },
-    { id = "chair", score = far_from_door(rect, self.door) },
-    { id = "cabinet", score = against_wall(rect) },
+-- Places the objects still waiting in the editor's list (its required
+-- objects, and any extras bought) where the editor accepts them, as clicks
+-- would. door is the door's floor tile, or nil. Returns true if all were
+-- placed.
+function QuickBuild.placeRemaining(edit, rect, door)
+  local world = TheApp.world
+  door = door or { x = rect.x + math.floor(rect.w / 2), y = rect.y }
+  local scores = {
+    desk = far_from_door(rect, door),
+    chair = far_from_door(rect, door),
   }
-  -- Anything else the room needs goes against a wall, biggest first so the
-  -- small things fit around it.
-  local others = {}
-  for id in pairs(self.room_type.objects_needed) do
-    local known = false
-    for _, p in ipairs(preferences) do
-      if p.id == id then known = true end
-    end
-    if not known then
-      others[#others + 1] = id
-    end
-  end
-  local function footprint_size(id)
-    local object = TheApp.objects[id]
-    local orientation = object and object.orientations and object.orientations.north
+  local function footprint_size(object)
+    local orientation = object.orientations and object.orientations.north
     return orientation and #orientation.footprint or 1
   end
-  table.sort(others, function(a, b)
-    if footprint_size(a) ~= footprint_size(b) then
-      return footprint_size(a) > footprint_size(b)
-    end
-    return a < b
-  end)
-  for _, id in ipairs(others) do
-    preferences[#preferences + 1] = { id = id, score = against_wall(rect) }
-  end
-
   local tiles = {}
   for y = rect.y, rect.y + rect.h - 1 do
     for x = rect.x, rect.x + rect.w - 1 do
@@ -273,37 +306,38 @@ function QuickBuild:placeObjects()
     end
   end
 
-  for _, pref in ipairs(preferences) do
-    local needed = self.room_type.objects_needed[pref.id] or 0
-    for _ = 1, needed do
-      local index
-      for i, entry in ipairs(edit.objects) do
-        if entry.object.id == pref.id then index = i end
+  while #edit.objects > 0 do
+    -- Desks and chairs first (as a GP's office needs), then the biggest.
+    local best
+    for i, entry in ipairs(edit.objects) do
+      local id = entry.object.id
+      local rank = (id == "desk" and 3 or id == "chair" and 2 or 1) * 100 + footprint_size(entry.object)
+      if not best or rank > best.rank then
+        best = { index = i, rank = rank, object = entry.object }
       end
-      if not index then
-        break
-      end
-      edit:setActiveIndex(index)
-      table.sort(tiles, function(a, b) return pref.score(a.x, a.y) > pref.score(b.x, b.y) end)
-      local placed = false
-      for _, tile in ipairs(tiles) do
-        for _, orientation in ipairs({ "north", "east", "south", "west" }) do
-          if edit.objects[edit.active_index].object.orientations[orientation] then
-            edit:setOrientation(orientation)
-            edit:setBlueprintCell(tile.x, tile.y)
-            if edit.object_blueprint_good and
-                not world:anyHumanoidObscuringArea(tile.x, tile.y) then
-              edit:placeObject()
-              placed = true
-              break
-            end
+    end
+    edit.place_objects = true
+    edit:setActiveIndex(best.index)
+    local score = scores[best.object.id] or against_wall(rect)
+    table.sort(tiles, function(a, b) return score(a.x, a.y) > score(b.x, b.y) end)
+    local placed = false
+    for _, tile in ipairs(tiles) do
+      for _, orientation in ipairs({ "north", "east", "south", "west" }) do
+        if best.object.orientations[orientation] then
+          edit:setOrientation(orientation)
+          edit:setBlueprintCell(tile.x, tile.y)
+          if edit.object_blueprint_good and
+              not world:anyHumanoidObscuringArea(tile.x, tile.y) then
+            edit:placeObject()
+            placed = true
+            break
           end
         end
-        if placed then break end
       end
-      if not placed then
-        return false
-      end
+      if placed then break end
+    end
+    if not placed then
+      return false
     end
   end
   return true
@@ -325,7 +359,8 @@ function QuickBuild:onTick()
       return false -- Still waiting for people to leave the area.
     end
     self.waiting_for_objects = false
-    if self:placeObjects() and self.edit.confirm_button.enabled then
+    if QuickBuild.placeRemaining(self.edit, self.rect, self.door) and
+        self.edit.confirm_button.enabled then
       self.edit:confirm(true) -- Pays and opens the room, as clicking the tick does.
       self.finished = true
       return true

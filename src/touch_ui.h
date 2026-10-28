@@ -66,6 +66,15 @@ bool handle_event(const SDL_Event& e);
 //! cursor like a laptop trackpad) or "direct" (click where you touch).
 void set_controls(const char* name);
 
+//! Placing things: touches act directly where the finger is, but with the
+//! pointer about 40 points above it so the finger doesn't hide what's being
+//! placed. Turning it off restores the player's own touch controls.
+void set_placement_mode(bool on);
+bool placement_mode_on();
+
+//! The placement pointer's offset above the finger, in game pixels.
+float placement_offset();
+
 //! Sets the trackpad cursor speed multiplier (1 = the finger's distance).
 void set_cursor_speed(double speed);
 

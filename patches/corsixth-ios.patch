@@ -248,6 +248,32 @@ index fb7f2fa..c1a0ea4 100644
    local s = TheApp.config.ui_scale
    return x >= (x_offset and x_offset * s or 0) and y >= 0 and x < self.width * s and y < self.height * s
  end
+diff --git a/CorsixTH/Lua/dialogs/edit_room.lua b/CorsixTH/Lua/dialogs/edit_room.lua
+index 5cdf38c..6b85443 100644
+--- a/CorsixTH/Lua/dialogs/edit_room.lua
++++ b/CorsixTH/Lua/dialogs/edit_room.lua
+@@ -1108,10 +1108,19 @@ function UIEditRoom:tryRemoveWindowFromWall(x, y)
+   if not cell_x then
+     return
+   end
++  self:removeWindowAt(cell_x, cell_y, wall_dir)
++end
++
++--! Whether there's a window in the blueprint at this floor tile's wall.
++function UIEditRoom:windowAt(cell_x, cell_y, wall_dir)
++  local map = TheApp.map.th
++  return map:getCell(cell_x, cell_y, 4) == window_floor_blueprint_markers[wall_dir]
++end
+ 
++--! Removes the window in the blueprint at this floor tile's wall, if any.
++function UIEditRoom:removeWindowAt(cell_x, cell_y, wall_dir)
+   local map = TheApp.map.th
+-  local cell_flag = map:getCell(cell_x, cell_y, 4)
+-  if cell_flag == window_floor_blueprint_markers[wall_dir] then -- right click on a wall with a window
++  if self:windowAt(cell_x, cell_y, wall_dir) then -- a wall with a window
+     local wall_x, wall_y = cell_x, cell_y
+     local direction_flag = (wall_dir == "south" or wall_dir == "north") and 0 or 1
+     if wall_dir == "south" then
 diff --git a/CorsixTH/Lua/dialogs/menu.lua b/CorsixTH/Lua/dialogs/menu.lua
 index a571816..1b804c9 100644
 --- a/CorsixTH/Lua/dialogs/menu.lua
@@ -263,7 +289,7 @@ index a571816..1b804c9 100644
    self.visible = true
    if not self.on_top then
 diff --git a/CorsixTH/Lua/game_ui.lua b/CorsixTH/Lua/game_ui.lua
-index ef575f9..fb5873f 100644
+index ef575f9..40900d1 100644
 --- a/CorsixTH/Lua/game_ui.lua
 +++ b/CorsixTH/Lua/game_ui.lua
 @@ -590,8 +590,11 @@ function GameUI:onMouseMove(x, y, dx, dy)
@@ -301,17 +327,7 @@ index ef575f9..fb5873f 100644
      -- calculate magnitude of pinch
      local mag = math.abs(dDist)
      if mag > multigesture_pinch_sensitivity_factor then
-@@ -839,6 +854,9 @@ end
- 
- function GameUI:onTick()
-   local repaint = UI.onTick(self)
-+  if self.app.native then
-+    self.app.native:onTick()
-+  end
-   if not self:_isMouseScrollButtonDown() then
-     if math.abs(self.current_momentum.x) < 0.2 and math.abs(self.current_momentum.y) < 0.2 then
-       -- Stop scrolling
-@@ -857,6 +875,14 @@ function GameUI:onTick()
+@@ -857,6 +872,14 @@ function GameUI:onTick()
      end
      self.multigesturemove.x = 0.0
      self.multigesturemove.y = 0.0
@@ -326,6 +342,18 @@ index ef575f9..fb5873f 100644
    end
    if self.tick_scroll_amount or self.tick_scroll_amount_mouse then
      -- The scroll amount per tick gradually increases as the duration of the
+@@ -910,6 +933,11 @@ function GameUI:onTick()
+ 
+   self.announcer:onTick()
+ 
++  -- iOS native controls (lua/native_ui.lua); last, after the cursor update.
++  if self.app.native then
++    self.app.native:onTick()
++  end
++
+   return repaint
+ end
+ 
 diff --git a/CorsixTH/Lua/ui.lua b/CorsixTH/Lua/ui.lua
 index 8c6cc93..98c04f5 100644
 --- a/CorsixTH/Lua/ui.lua

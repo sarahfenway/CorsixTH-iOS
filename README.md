@@ -81,7 +81,10 @@ If you'd rather click wherever you touch, set `touch_controls = [[direct]]` in
 
 Menus are native iOS screens. In a game, the bar at the top right builds rooms (a panel lists them;
 and any room can be Quick Built: the game suggests a spot, you drag the handles to move or resize
-it, then tap Build and the door and required furniture are placed for you), hires staff (a panel lists who's
+it, then tap Build and the door and required furniture are placed for you, or Customise to choose
+the door, windows and furniture yourself; Edit Room changes a built room and Furnish Corridor
+buys and places benches, reception desks and so on: tap the map to place, long press an item to
+move it), hires staff (a panel lists who's
 looking for work, with their faces, skills and wages; the person you hire starts in the corridor, or
 at a free reception desk), furnishes
 corridors, edits rooms and hires staff; its building button opens the hospital screens (staff,

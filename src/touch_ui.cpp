@@ -83,6 +83,12 @@ int screen_h = 0;
 gesture_recogniser direct;
 trackpad_recogniser trackpad;
 bool trackpad_mode = true;
+// Placing things (native room editor): direct touches with the pointer raised
+// above the finger, so what's being placed isn't hidden under it.
+bool placement_mode = false;
+bool trackpad_before_placement = true;
+constexpr float placement_offset_points = 40.0f;
+
 std::vector<mouse_action> actions;
 // The game's logical screen size, as last seen on the renderer.
 int logical_w = 0;
@@ -123,6 +129,9 @@ bool finger_to_logical(const SDL_TouchFingerEvent& f, int* x, int* y) {
   if (lw > 0 && lh > 0) {
     logical_w = lw;
     logical_h = lh;
+    if (placement_mode) {
+      ly -= placement_offset();
+    }
     lx = std::clamp(lx, 0.0f, static_cast<float>(lw - 1));
     ly = std::clamp(ly, 0.0f, static_cast<float>(lh - 1));
   }
@@ -410,6 +419,48 @@ void poll() {
     direct.tick(SDL_GetTicks(), actions);  // long press
   }
   flush_actions();
+}
+
+void set_placement_mode(bool on) {
+  if (on == placement_mode) {
+    return;
+  }
+  if (on) {
+    trackpad_before_placement = trackpad_mode;
+    set_controls("direct");
+    placement_mode = true;
+  } else {
+    placement_mode = false;
+    set_controls(trackpad_before_placement ? "trackpad" : "direct");
+  }
+}
+
+bool placement_mode_on() { return placement_mode; }
+
+float placement_offset() {
+  // The window may not be known yet; then there's no offset to speak of.
+  SDL_Window* window = SDL_GetKeyboardFocus();
+  if (window == nullptr) {
+    window = SDL_GetMouseFocus();
+  }
+  for (Uint32 id = 1; window == nullptr && id < 16; ++id) {
+    window = SDL_GetWindowFromID(id);
+  }
+  SDL_Renderer* renderer = window != nullptr ? SDL_GetRenderer(window) : nullptr;
+  int wh = 0;
+  int lh = 0;
+  if (window != nullptr) {
+    int ww = 0;
+    SDL_GetWindowSize(window, &ww, &wh);
+  }
+  if (renderer != nullptr) {
+    int lw = 0;
+    SDL_RenderGetLogicalSize(renderer, &lw, &lh);
+  }
+  if (wh <= 0 || lh <= 0) {
+    return 0.0f;
+  }
+  return placement_offset_points * static_cast<float>(lh) / static_cast<float>(wh);
 }
 
 void set_cursor_speed(double speed) {

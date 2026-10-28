@@ -296,6 +296,26 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
     SDL_FingerID f = s.next_finger++;
     add_finger(SDL_FINGERDOWN, f, p, now);
     add_finger(SDL_FINGERUP, f, p, now + 50);
+  } else if (command == "tap_at" || command == "long_press_at") {
+    // Where comes from Lua: an expression giving a table {x, y}.
+    bool truthy = false;
+    std::string result;
+    if (rest.empty() ||
+        !run_lua(L, "local t = (" + rest + ") return t[1] .. ' ' .. t[2]",
+                 &truthy, &result) ||
+        !parse_numbers(result, 2, &n)) {
+      finish(false, "can't work out where: " + result);
+      return false;
+    }
+    point p = to_window(n[0], n[1]);
+    SDL_FingerID f = s.next_finger++;
+    add_finger(SDL_FINGERDOWN, f, p, now);
+    if (command == "long_press_at") {
+      // Held still: the touch controls turn this into a right click.
+      add_finger(SDL_FINGERUP, f, p, now + 800);
+    } else {
+      add_finger(SDL_FINGERUP, f, p, now + 50);
+    }
   } else if (command == "drag") {
     if (!parse_numbers(rest, 5, &n)) {
       return bad("drag <x1> <y1> <x2> <y2> <ms>");

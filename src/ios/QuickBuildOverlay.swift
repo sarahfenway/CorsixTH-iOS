@@ -2,7 +2,7 @@
 // src/native_bridge.h for the full text).
 //
 // Quick Build's overlay on the map: finger handles on the room outline's
-// corners and middle, and a bar with Cancel / By Hand / Build. The outline
+// corners and middle, and a bar with Cancel / Customise / Build. The outline
 // itself is the game's own blueprint; Lua (lua/quick_build.lua) sends where
 // its corners are on screen, in game pixels, whenever they move.
 
@@ -19,7 +19,7 @@ struct QuickBuildState: Decodable {
 }
 
 // Lets touches through to the game except on its own controls.
-private final class PassthroughView: UIView {
+final class PassthroughView: UIView {
   override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
     let hit = super.hitTest(point, with: event)
     return hit === self ? nil : hit
@@ -77,8 +77,8 @@ final class QuickBuildOverlay {
     let cancel = QuickBuildOverlay.barButton(title: nil, symbol: "xmark", label: "Cancel") {
       NativeUI.post("quick_build_cancel")
     }
-    let byHand = QuickBuildOverlay.barButton(title: "By Hand", symbol: nil, label: "By Hand") {
-      NativeUI.post("quick_build_by_hand")
+    let byHand = QuickBuildOverlay.barButton(title: "Customise", symbol: nil, label: "Customise") {
+      NativeUI.post("quick_build_customise")
     }
     var config = UIButton.Configuration.borderedProminent()
     config.title = "Build"
