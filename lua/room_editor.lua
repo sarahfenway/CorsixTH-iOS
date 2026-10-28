@@ -129,11 +129,56 @@ local wall_midpoints = {
   north = { 0.5, 0 }, south = { 0.5, 1 }, west = { 0, 0.5 }, east = { 1, 0.5 },
 }
 
+local function segmentId(seg)
+  return ("%d,%d,%s"):format(seg.x, seg.y, seg.wall)
+end
+
+--! What each wall segment can be in the windows stage, asked of the game:
+-- "window" (has one), "door" (part of the door: no window), "wall" (a window
+-- can go here) or "blocked" (it can't: say another wall meets it there).
+function RoomEditor:windowOptions()
+  local edit = self.edit
+  local options = {}
+  for _, seg in ipairs(self:wallSegments()) do
+    local id = segmentId(seg)
+    if edit:windowAt(seg.x, seg.y, seg.wall) then
+      options[id] = "window"
+    else
+      -- The wall piece a window would replace, as setWindowBlueprint finds
+      -- it; the door's pieces are tagged (swing doors have three).
+      local x, y = seg.x, seg.y
+      if seg.wall == "south" then
+        y = y + 1
+      elseif seg.wall == "east" then
+        x = x + 1
+      end
+      local anim = edit.blueprint_wall_anims[x] and edit.blueprint_wall_anims[x][y]
+      local tag = anim and anim:getTag()
+      if tag and tag ~= "window" then
+        options[id] = "door"
+      else
+        -- As hovering the mouse there: the game says if a window would fit.
+        edit:setWindowBlueprint(seg.x, seg.y, seg.wall)
+        options[id] = edit.blueprint_window.valid and "wall" or "blocked"
+      end
+    end
+  end
+  edit:setWindowBlueprint(nil, nil, nil)
+  return options
+end
+
 function RoomEditor:markers()
   local edit, ui = self.edit, self.ui
   local markers = {}
   local door = edit.blueprint_door or {}
+  if edit.phase == "windows" then
+    -- Windows only change when the player taps a marker (see marker()).
+    self.window_options = self.window_options or self:windowOptions()
+  else
+    self.window_options = nil
+  end
   for _, seg in ipairs(self:wallSegments()) do
+    local id = segmentId(seg)
     local m = wall_midpoints[seg.wall]
     local sx, sy = ui:WorldToScreen(seg.x + m[1], seg.y + m[2])
     -- Up the wall a little, where the door or window shows.
@@ -142,11 +187,16 @@ function RoomEditor:markers()
     if edit.phase == "door" and door.floor_x == seg.x and door.floor_y == seg.y then
       -- (Edge tiles that aren't corners have just the one outer wall.)
       state = door.valid and "door" or "bad"
-    elseif edit.phase == "windows" and edit:windowAt(seg.x, seg.y, seg.wall) then
-      state = "window"
+    elseif edit.phase == "windows" then
+      state = self.window_options[id] or "wall"
+      -- The door is shown but can't be tapped in this stage.
+      if state == "door" then
+        state = "door_fixed"
+      end
     end
-    markers[#markers + 1] = { id = ("%d,%d,%s"):format(seg.x, seg.y, seg.wall),
-      x = sx, y = sy, state = state }
+    if state ~= "blocked" then
+      markers[#markers + 1] = { id = id, x = sx, y = sy, state = state }
+    end
   end
   return markers
 end
@@ -279,6 +329,7 @@ function RoomEditor:marker(id)
       edit:setWindowBlueprint(x, y, wall) -- As moving the mouse there...
       edit:placeWindowBlueprint() -- ...and clicking.
     end
+    self.window_options = nil -- Ask the game again.
   end
   self:sendState(true)
 end

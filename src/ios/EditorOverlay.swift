@@ -22,7 +22,9 @@ struct EditorMarker: Decodable, Hashable {
   var id: String
   var x: Double
   var y: Double
-  var state: String  // "wall", "door", "bad" (a door that can't go there), "window"
+  // "wall", "door", "bad" (a door that can't go there), "window",
+  // "door_fixed" (the door, shown in the windows stage; not tappable)
+  var state: String
 }
 
 struct TrayPlaceRow: Decodable, Hashable, Identifiable {
@@ -241,7 +243,7 @@ final class EditorOverlay {
     let symbol: String
     let colour: UIColor
     switch state {
-    case "door":
+    case "door", "door_fixed":
       symbol = "door.left.hand.open"
       colour = .systemGreen
     case "bad":
@@ -259,7 +261,9 @@ final class EditorOverlay {
       UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)),
       for: .normal)
     b.tintColor = .white
-    b.accessibilityValue = state
+    b.adjustsImageWhenDisabled = false
+    b.isEnabled = state != "door_fixed"
+    b.accessibilityValue = state == "door_fixed" ? "door" : state
   }
 }
 

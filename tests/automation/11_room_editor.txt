@@ -24,6 +24,12 @@ lua require("sdl").native.post("editor_marker", '{"id":"' .. rawget(_G, "auto_do
 wait_until 1000 TheApp.ui:getWindow(UIEditRoom).blueprint_door.valid
 native_tap Next
 wait_until 3000 TheApp.ui:getWindow(UIEditRoom).phase == "windows"
+# The door's wall shows the door (not tappable), and every "+" left is a wall
+# the game accepts a window on.
+lua local ed = TheApp.native.editor; local c = ed.door_choice; local id = c.x .. "," .. c.y .. "," .. c.wall; local st; for _, m in ipairs(ed:markers()) do if m.id == id then st = m.state end end; rawset(_G, "auto_door_marker", st); return tostring(st)
+expect rawget(_G, "auto_door_marker") == "door_fixed"
+lua local ed = TheApp.native.editor; local edit = ed.edit; local ok, n = true, 0; for _, m in ipairs(ed:markers()) do if m.state == "wall" then n = n + 1; local x, y, w = m.id:match("^(%d+),(%d+),(%a+)$"); edit:setWindowBlueprint(tonumber(x), tonumber(y), w); ok = ok and edit.blueprint_window.valid end end; edit:setWindowBlueprint(nil, nil, nil); rawset(_G, "auto_plus_ok", ok); return n .. " plus markers, all take a window: " .. tostring(ok)
+expect rawget(_G, "auto_plus_ok")
 # A window: find a wall the game accepts, then remove and re-add it by marker.
 lua local ed = TheApp.native.editor; local edit = ed.edit; local chosen; for _, m in ipairs(ed:markers()) do local x, y, w = m.id:match("^(%d+),(%d+),(%a+)$"); ed:marker(m.id); if edit:windowAt(tonumber(x), tonumber(y), w) then chosen = m.id; break end end; rawset(_G, "auto_window", chosen); return tostring(chosen)
 expect rawget(_G, "auto_window") ~= nil
