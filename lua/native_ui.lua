@@ -174,6 +174,14 @@ function NativeUI:message(text)
   SDL.native.show("alert", json.encode({ message = text }))
 end
 
+--! Asks the player with a native alert: Cancel, or `yes` (a destructive
+-- button), which runs on_yes.
+function NativeUI:confirm(message, yes, on_yes)
+  self.confirm_id = (self.confirm_id or 0) + 1
+  self.confirm_callback = { id = self.confirm_id, fn = on_yes }
+  SDL.native.show("alert", json.encode({ message = message, confirm = yes, id = self.confirm_id }))
+end
+
 --! Ends a Quick Build or editing session in progress (a game is being
 -- loaded or left).
 function NativeUI:endQuickBuild()
@@ -1137,7 +1145,31 @@ end
 
 
 function actions.quick_build_cancel(self)
+  local qb = self.quick_build
+  if qb and qb.edit.paid and not qb.edit.closed then
+    -- A built room being moved: the game's Cancel here deletes it.
+    self:confirm(("Delete this %s? You'll get some of its cost back."):format(
+        json.text(qb.edit.room_type.name)), "Delete Room", function()
+      if self.quick_build == qb then
+        qb.finished = true
+        self.quick_build = nil
+        SDL.native.setQuickBuild(nil)
+        editing.deleteRoom(self, qb.edit)
+      end
+    end)
+    return
+  end
   self:endQuickBuild()
+end
+
+function actions.alert_answer(self, p)
+  local pending = self.confirm_callback
+  if pending and pending.id == tonumber(p.id) then
+    self.confirm_callback = nil
+    if p.ok then
+      pending.fn()
+    end
+  end
 end
 
 function actions.set_speed(self, p)

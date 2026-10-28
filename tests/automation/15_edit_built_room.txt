@@ -1,0 +1,70 @@
+# Editing a built room: the bin asks before deleting (Cancel keeps the room),
+# Move Room lifts it onto Quick Build's handles and rebuilds it elsewhere for
+# free, and Delete Room removes it with the game's refund.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua TheApp.native:show("room_catalog")
+wait 800
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 800
+native_tap Build
+wait_until 20000 TheApp.native.quick_build == nil
+wait 1000
+lua local found; for _, room in pairs(TheApp.world.rooms) do if room.room_info.id == "gp" then found = room end end; rawset(_G, "auto_gp", found); return found and (found.x .. "," .. found.y .. " built " .. tostring(found.built)) or "none"
+expect rawget(_G, "auto_gp") ~= nil and rawget(_G, "auto_gp").built
+# Edit it.
+native_tap Edit Room
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui.edit_room == true
+tap_at (function() local r = rawget(_G, "auto_gp"); local sx, sy = TheApp.ui:WorldToScreen(r.x + r.width / 2, r.y + r.height / 2); return {sx, sy} end)()
+wait_until 10000 TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
+wait 500
+screenshot 1_editing
+# The bin asks first; Cancel keeps the room and the editor.
+lua rawset(_G, "auto_money", TheApp.ui.hospital.balance); return auto_money
+native_tap Cancel
+wait 1000
+screenshot 2_delete_question
+native_tap Cancel
+wait 800
+expect TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+expect TheApp.world.rooms[rawget(_G, "auto_gp").id] == rawget(_G, "auto_gp")
+expect TheApp.ui.hospital.balance == rawget(_G, "auto_money")
+# Move Room: Quick Build's handles on the room, free to move.
+native_tap Move Room
+wait_until 3000 TheApp.native.quick_build ~= nil and TheApp.native.editor == nil
+expect TheApp.ui:getWindow(UIEditRoom).phase == "walls"
+expect TheApp.native.quick_build:cost() == 0
+wait 500
+screenshot 3_moving
+# Find a spot a few tiles away the game accepts (as dragging the move handle).
+lua local qb = TheApp.native.quick_build; local r = qb.rect; local ui = TheApp.ui; local x1, y1 = ui:WorldToScreen(r.x + r.w / 2, r.y + r.h / 2); local ok; for _, d in ipairs({{3, 0}, {-3, 0}, {0, 3}, {0, -3}, {4, 0}, {-4, 0}, {0, 4}, {0, -4}}) do local x2, y2 = ui:WorldToScreen(r.x + r.w / 2 + d[1], r.y + r.h / 2 + d[2]); qb:drag("move", x1, y1, false); qb:drag("move", x2, y2, true); if qb:isValid() then ok = d; break end; local bx, by = ui:WorldToScreen(qb.rect.x + qb.rect.w / 2, qb.rect.y + qb.rect.h / 2); qb:drag("move", bx, by, false); qb:drag("move", x1, y1, true) end; rawset(_G, "auto_moved_to", {qb.rect.x, qb.rect.y}); return ok and (ok[1] .. "," .. ok[2] .. " -> " .. qb.rect.x .. "," .. qb.rect.y) or "nowhere"
+expect rawget(_G, "auto_moved_to")[1] ~= rawget(_G, "auto_gp").x or rawget(_G, "auto_moved_to")[2] ~= rawget(_G, "auto_gp").y
+native_tap Build
+wait_until 20000 TheApp.native.quick_build == nil
+wait 1500
+screenshot 4_moved
+lua local found; for _, room in pairs(TheApp.world.rooms) do if room.room_info.id == "gp" and room.built then found = room end end; rawset(_G, "auto_gp2", found); local n = 0; if found then for _ in pairs(found.objects) do n = n + 1 end end; return found and (found.x .. "," .. found.y .. " objects " .. n) or "none"
+expect rawget(_G, "auto_gp2") ~= nil and rawget(_G, "auto_gp2").x == rawget(_G, "auto_moved_to")[1] and rawget(_G, "auto_gp2").y == rawget(_G, "auto_moved_to")[2]
+expect TheApp.ui.hospital.balance == rawget(_G, "auto_money")
+expect TheApp.ui:getWindow(UIEditRoom) == nil
+# Edit it again and delete it: Delete Room answers the game's own question.
+native_tap Edit Room
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui.edit_room == true
+tap_at (function() local r = rawget(_G, "auto_gp2"); local sx, sy = TheApp.ui:WorldToScreen(r.x + r.width / 2, r.y + r.height / 2); return {sx, sy} end)()
+wait_until 10000 TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
+wait 500
+native_tap Cancel
+wait 1000
+native_tap Delete Room
+wait_until 5000 TheApp.ui:getWindow(UIEditRoom) == nil
+wait 500
+expect TheApp.world.rooms[rawget(_G, "auto_gp2").id] == nil
+expect TheApp.native.editor == nil
+expect TheApp.ui.hospital.balance > rawget(_G, "auto_money")
+screenshot 5_deleted

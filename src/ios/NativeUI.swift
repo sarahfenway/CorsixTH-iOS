@@ -67,6 +67,8 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
   private var toolbar: GameToolbar?
   private var overlay: UIViewController?  // See overlayController().
   private weak var textAlert: UIAlertController?
+  private weak var questionAlert: UIAlertController?  // See showAlert(json:).
+  private var questionAnswers: [String: () -> Void] = [:]
   private var screenCString: UnsafeMutablePointer<CChar>?
 
   //! Sends an action to Lua. Values must be JSON compatible.
@@ -274,7 +276,18 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
     let info = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any] ?? [:]
     let alert = UIAlertController(
       title: nil, message: info["message"] as? String, preferredStyle: .alert)
-    alert.addAction(UIAlertAction(title: "OK", style: .default))
+    if let yes = info["confirm"] as? String {
+      // A question (NativeUI:confirm in Lua): Cancel, or a destructive yes.
+      let id = info["id"] as? Int ?? 0
+      let answer = { (ok: Bool) in NativeUI.post("alert_answer", ["id": id, "ok": ok]) }
+      alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in answer(false) })
+      alert.addAction(UIAlertAction(title: yes, style: .destructive) { _ in answer(true) })
+      // Alert buttons can't be pressed from code; tests answer through these.
+      questionAlert = alert
+      questionAnswers = ["Cancel": { answer(false) }, yes: { answer(true) }]
+    } else {
+      alert.addAction(UIAlertAction(title: "OK", style: .default))
+    }
     topViewController()?.present(alert, animated: true)
   }
 
@@ -327,6 +340,14 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
   // MARK: Accessibility (tests)
 
   func activate(label: String) -> Bool {
+    if let alert = questionAlert, alert.presentingViewController != nil,
+      let answer = questionAnswers[label]
+    {
+      questionAlert = nil
+      alert.dismiss(animated: true)
+      answer()
+      return true
+    }
     let windows = UIApplication.shared.connectedScenes
       .compactMap { $0 as? UIWindowScene }
       .flatMap { $0.windows }

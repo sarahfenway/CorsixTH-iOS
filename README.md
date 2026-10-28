@@ -112,7 +112,9 @@ an envelope when a message (fax) is waiting. The toolbar at the top right has:
   windows, then place furniture from a tray (Auto places whatever's left, and Extras buys more,
   such as plants and radiators).
 - **Furnish Corridor:** buy benches, reception desks, drinks machines and so on, then place them.
-- **Edit Room:** tap a room to move, add or remove its furniture.
+- **Edit Room:** tap a room to move, add or remove its furniture. **Move Room** lifts it back onto
+  the handles so you can move or resize it (free, as in the game; its furniture is placed again).
+  The bin deletes the room, after asking, and refunds part of its cost.
 - **Hire Staff:** a panel lists who's looking for work, with their faces, qualifications, skill
   and wages. The person you hire starts at a free reception desk (receptionists) or in the
   corridor, and the game sends them where they're needed.

@@ -128,6 +128,19 @@ local function placing_hint(window)
   return "Doesn't fit here: drag it somewhere else"
 end
 
+--! Deletes a built room the game's way: back through the editor to its
+-- outline, where Cancel asks "delete this room?". The player has already said
+-- yes in a native alert, so the game's own dialog is answered yes too (it
+-- refunds part of the cost, as there).
+local function delete_room(native, edit)
+  native.confirm_next = true
+  for _ = 1, 6 do
+    if edit.closed then break end
+    edit:cancel()
+  end
+  native.confirm_next = false
+end
+
 local function button(id, title, symbol, enabled, prominent)
   return { id = id, title = title, symbol = symbol, enabled = enabled ~= false,
     prominent = prominent or false }
@@ -334,6 +347,7 @@ function RoomEditor:sendState(force)
     state.hint = placing_hint(edit)
     state.tray = { place = place_rows(self.native, edit), buying = false }
     state.buttons = {
+      button("move", "Move Room", "arrow.up.and.down.and.arrow.left.and.right"),
       button("rotate", "Rotate", "rotate.right", left > 0),
       button("place_rest", "Auto", "wand.and.stars", left > 0),
       button("buy", "Extras", "cart"),
@@ -435,6 +449,20 @@ end
 function RoomEditor:pressed(id)
   local edit = self.edit
   local world = self.app.world
+  if id == "cancel" and edit.paid then
+    -- A built room: the bin deletes it, if the player says so.
+    self.native:confirm(("Delete this %s? You'll get some of its cost back."):format(
+        json.text(edit.room_type.name)), "Delete Room", function()
+      if self.finished or edit.closed then return end
+      if self.buying then
+        self.buying:close()
+        self.buying = nil
+      end
+      self:finish()
+      delete_room(self.native, edit)
+    end)
+    return
+  end
   if id == "cancel" then
     if self.buying then
       self.buying:close()
@@ -457,6 +485,13 @@ function RoomEditor:pressed(id)
   end
   if id == "back" then
     edit:cancel()
+  elseif id == "move" then
+    -- Back to the outline, as Back twice (furniture, door) does: the game
+    -- lifts the room and keeps its furniture to place again. Quick Build's
+    -- handles take over (see onTick).
+    for _ = 1, 2 do
+      if edit.phase ~= "walls" then edit:cancel() end
+    end
   elseif id == "next" then
     if edit.phase == "door" then
       if edit.blueprint_door.valid then
@@ -729,6 +764,7 @@ return {
   RoomPicker = RoomPicker,
   RoomEditor = RoomEditor,
   Furnisher = Furnisher,
+  deleteRoom = delete_room,
   hide = hide,
   unhide = unhide,
   OFFSCREEN = OFFSCREEN,

@@ -102,7 +102,7 @@ end
 
 function QuickBuild:cost()
   local world = self.app.world
-  if world.free_build_mode then return 0 end
+  if world.free_build_mode or self.edit.paid then return 0 end -- (Moving a built room is free.)
   return self.ui.hospital.research.research_progress[self.room_type].build_cost
 end
 
@@ -137,7 +137,7 @@ function QuickBuild:sendOverlay(force)
   local cx, cy = ui:WorldToScreen(rect.x + rect.w / 2, rect.y + rect.h / 2)
   local state = {
     name = json.text(self.room_type.name),
-    cost = self.native.formatMoney(self:cost()),
+    cost = self.edit.paid and "Move" or self.native.formatMoney(self:cost()),
     valid = self:isValid() and true or false,
     reason = self:reason(),
     logical = { self.app.config.width, self.app.config.height },
