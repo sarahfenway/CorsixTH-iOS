@@ -16,8 +16,9 @@
 #                                                   results in build-ios/automation/
 #
 # The first run asks which Apple development team should sign the app and
-# remembers the answer in .team-id. Environment overrides: TEAM_ID, BUNDLE_ID,
-# ICLOUD=OFF (keep save games on the device instead of in iCloud Drive).
+# remembers the answer in .team-id. Environment overrides: TEAM_ID, BUNDLE_ID
+# (remembered in .bundle-id once given), ICLOUD=OFF (keep save games on the
+# device instead of in iCloud Drive).
 # Needs: a Mac with Xcode (and its iOS platform) installed. Everything else
 # (CMake, SDL, Lua...) is downloaded into this folder. Works with macOS's
 # built-in bash 3.2.
@@ -26,7 +27,16 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$PWD"
 
-BUNDLE_ID="${BUNDLE_ID:-uk.me.krn.corsixth}"
+# The app's bundle ID must be unique to your developer team. One given in
+# BUNDLE_ID is remembered for next time.
+BUNDLE_FILE="$ROOT/.bundle-id"
+if [ -n "${BUNDLE_ID:-}" ]; then
+  printf '%s\n' "$BUNDLE_ID" > "$BUNDLE_FILE"
+elif [ -s "$BUNDLE_FILE" ]; then
+  BUNDLE_ID="$(head -n 1 "$BUNDLE_FILE")"
+else
+  BUNDLE_ID="uk.me.krn.corsixth"
+fi
 CMAKE_VERSION="4.4.4"
 BUILD_DIR="$ROOT/build-ios"
 INSTALL=0

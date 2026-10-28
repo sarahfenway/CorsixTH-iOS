@@ -1,9 +1,23 @@
 # Theme Hospital for iPhone and iPad
 
-This builds **CorsixTH**, the open-source rebuild of the Theme Hospital engine, as an iOS app.
-It uses the graphics, sounds and levels from your GOG copy of the game. The original game's
-program isn't used at all, so nothing gets decompiled. Your game data is bundled into the app,
-so there's nothing to copy across afterwards.
+This builds **CorsixTH**, the open-source rebuild of the Theme Hospital engine, as an iOS app
+with a touch-first, native iOS interface: Liquid Glass toolbars, native menus and panels, and
+building, furnishing and hiring by touch. It uses the graphics, sounds and levels from your own
+GOG copy of the game. The original game's program isn't used at all, so nothing gets decompiled.
+Your game data is bundled into the app, so there's nothing to copy across afterwards.
+
+This repository holds only this project's own code. The build script downloads CorsixTH and the
+libraries it needs, and takes the game data from your installer. There's no App Store version:
+you build it and install it on your own iPhone or iPad.
+
+An unofficial project, not affiliated with Electronic Arts, GOG or the CorsixTH team.
+
+## Get the code
+
+```bash
+git clone https://github.com/sarahfenway/CorsixTH-iOS.git
+cd CorsixTH-iOS
+```
 
 ## What you need
 
@@ -19,7 +33,6 @@ so there's nothing to copy across afterwards.
 ## Build it
 
 ```bash
-cd CorsixTH-iOS
 bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
 ```
 
@@ -32,7 +45,16 @@ you'd rather get it yourself, download the
 [CorsixTH 0.70.1 source](https://github.com/CorsixTH/CorsixTH/releases/tag/v0.70.1) and unzip it
 so that `CorsixTH/CorsixTH/CorsixTH.lua` exists before running the script.
 
-On the first run it lists the development teams on your Mac and asks which one should sign the
+Every app needs a bundle ID that no other developer has registered, and the default one is
+taken, so on your first run give your own in reverse-DNS form (any name you like):
+
+```bash
+BUNDLE_ID=com.yourname.themehospital bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
+```
+
+It's remembered in `.bundle-id`, so later runs don't need it.
+
+On the first run it also lists the development teams on your Mac and asks which one should sign the
 app. Pick your own (the one marked **Personal Team** if you're on a free Apple ID), not a work
 team. The answer is saved in `.team-id`. To change it later, run `bash build-ios.sh --team`.
 
@@ -79,19 +101,28 @@ If you'd rather click wherever you touch, set `touch_controls = [[direct]]` in
 | Long press or two-finger tap | Right click |
 | Two-finger drag / pinch | Moves the map / zooms |
 
-Menus are native iOS screens. In a game, the bar at the top right builds rooms (a panel lists them;
-and any room can be Quick Built: the game suggests a spot, you drag the handles to move or resize
-it, then tap Build and the door and required furniture are placed for you, or Customise to choose
-the door, windows and furniture yourself; Edit Room changes a built room and Furnish Corridor
-buys and places benches, reception desks and so on: tap the map to place, long press an item to
-move it), hires staff (a panel lists who's
-looking for work, with their faces, skills and wages; the person you hire starts in the corridor, or
-at a free reception desk), furnishes
-corridors, edits rooms and hires staff; its building button opens the hospital screens (staff,
-town map, research, casebook, graphs, bank...), the play button sets the game speed and the ••• button
-opens the game menu (save, load, settings, restart, quit), which pauses the game. Money, the date
-and reputation are at the top left, with an envelope when a message (fax) is waiting. Text entry
-uses the iOS keyboard. On an iPad, a real trackpad or mouse works too, including right click.
+Menus are native iOS screens. In a game, money, the date and reputation are at the top left, with
+an envelope when a message (fax) is waiting. The toolbar at the top right has:
+
+- **Build Room:** a panel lists the rooms with pictures. Pick one and the game suggests a spot;
+  drag the handles to move or resize it. **Build** places the door and the required furniture for
+  you. **Customise** lets you choose instead: tap a wall marker for the door, tap walls to add
+  windows, then place furniture from a tray by tapping the map (Auto places whatever's left, and
+  Extras buys more, such as plants and radiators).
+- **Furnish Corridor:** buy benches, reception desks, drinks machines and so on, then tap the map
+  to place them.
+- **Edit Room:** tap a room to move, add or remove its furniture.
+- **Hire Staff:** a panel lists who's looking for work, with their faces, qualifications, skill
+  and wages. The person you hire starts at a free reception desk (receptionists) or in the
+  corridor, and the game sends them where they're needed.
+- **Hospital** (building icon): the staff, town map, research, casebook, graphs, bank and other
+  screens.
+- **Speed** (play button), and **•••** for the game menu (save, load, settings, restart, quit),
+  which pauses the game.
+
+While placing anything, a long press on an item picks it up again, and the pointer sits a little
+above your finger so you can see what you're placing. Text entry uses the iOS keyboard. On an iPad,
+a real trackpad or mouse works too, including right click.
 
 ## Saves, settings and music
 
@@ -130,17 +161,18 @@ settings. Sound effects and the announcer work as normal.
 - **Wrong team:** run `bash build-ios.sh --team` and pick again.
 - **Signing errors about iCloud:** Xcode normally switches iCloud on for the app ID by itself. If it
   doesn't, open Signing & Capabilities in Xcode, click **+ Capability**, add **iCloud**, tick
-  **iCloud Documents** and the container `iCloud.uk.me.krn.corsixth` (press + to create it if
+  **iCloud Documents** and the container `iCloud.` followed by your bundle ID (press + to create it if
   needed), then build again. To skip iCloud entirely, use `ICLOUD=OFF bash build-ios.sh`.
-- **"Bundle identifier is not available":** another team has already registered
-  `uk.me.krn.corsixth`. This happens if Xcode tried to sign with a different team first,
-  because Xcode registers the ID with whichever team it uses. Either delete it from that team at
-  developer.apple.com > Certificates, Identifiers & Profiles > Identifiers, or use a new one:
-  `BUNDLE_ID=uk.me.krn.themehospital bash build-ios.sh`.
+- **"Bundle identifier is not available":** another team has already registered that bundle ID
+  (the default one, or yours if Xcode first tried to sign with a different team: it registers the
+  ID with whichever team it uses). Pick a new one, `BUNDLE_ID=com.yourname.themehospital bash
+  build-ios.sh`, or delete it from the other team at developer.apple.com > Certificates,
+  Identifiers & Profiles > Identifiers.
 - **CMake errors:** the whole log is in `build-ios.cmake.log`.
 - **The game can't find its data:** check that `ThemeHospital/` in this folder has `DATA`, `LEVELS`
   and `QDATA` folders, then rebuild.
-- **Start again from scratch:** delete `build-ios/` (and `deps/` and `CorsixTH/` to re-download the sources).
+- **Start again from scratch:** delete `build-ios/` (and `deps/` and `CorsixTH/` to re-download
+  the sources).
 
 ## How the port is put together
 
@@ -176,5 +208,26 @@ Apple's scene-based life cycle (UIScene), which SDL2 predates. The approach come
 app delegate doubles as the scene delegate, the game starts when the scene connects, and windows
 are created inside it.
 
-CorsixTH is MIT licensed. Theme Hospital's data belongs to EA, so use your own copy and don't
-share builds that contain it.
+## Developing
+
+Read [`CLAUDE.md`](CLAUDE.md) first: it maps the code and lists the rules (our code goes in `src/`
+and `lua/`; changes to CorsixTH's own files go in `patches/corsixth-ios.patch`; no game data or
+CorsixTH source in git). [`PLAN.md`](PLAN.md) is the roadmap.
+
+```bash
+bash build-ios.sh --simulator             # build and run in the iOS Simulator
+bash build-ios.sh --run tests/automation  # build, then run every scripted test; PASS/FAIL each
+```
+
+The scripted tests drive the game in the simulator with real touch events and check its state
+(results and screenshots go to `build-ios/automation/`). They need the game data, like any build.
+The unit tests for the touch code need only a C++ compiler; see `CLAUDE.md`.
+
+## Licence
+
+This project's code is under the MIT licence: see [`LICENSE`](LICENSE). CorsixTH is also MIT
+licensed; [`NOTICE.md`](NOTICE.md) lists what in this repository comes from CorsixTH and the other
+projects it builds on.
+
+Theme Hospital's data belongs to Electronic Arts. It isn't in this repository, so use your own copy
+and don't share apps built with it.
