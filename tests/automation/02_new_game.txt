@@ -4,9 +4,6 @@ controls direct
 wait_until 30000 require("sdl").native.screen() == "main_menu"
 wait 1000
 screenshot 1_main_menu
-# The main menu's pictures come from the game's own art.
-lua local n = 0; for _, path in pairs(TheApp.native:state().pictures or {}) do if lfs.attributes(path, "size") then n = n + 1 end end; rawset(_G, "auto_pics", n); return n
-expect rawget(_G, "auto_pics") == 9
 # SwiftUI rows can't be tapped by scripts (no accessibility tree without
 # VoiceOver), so send what the New Game screen's Start button sends.
 lua require("sdl").native.post("new_game", '{"difficulty":"easy","tutorial":false}')

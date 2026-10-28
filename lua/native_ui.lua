@@ -415,11 +415,6 @@ local sprites = {
   status = { "Data", "Panel02V", 23, { 1, 6, 35, 36 } },
   charts = { "Data", "Panel02V", 25, { 1, 6, 35, 36 } },
   policy = { "Data", "Panel02V", 27, { 1, 6, 35, 36 } },
-  -- Staff portraits from the hire window (UIHireStaff), without the count box.
-  doctor = { "QData", "Req11V", 264, { 5, 7, 30, 37 } },
-  nurse = { "QData", "Req11V", 266, { 5, 7, 30, 37 } },
-  handyman = { "QData", "Req11V", 268, { 5, 7, 30, 37 } },
-  receptionist = { "QData", "Req11V", 270, { 5, 7, 30, 37 } },
 }
 
 --! A picture of one of the game's sprites (see `sprites`). Returns the PNG's
@@ -516,11 +511,6 @@ function NativeUI:state()
     state.difficulties = difficulties
     state.default_difficulty = "full"
     state.can_tutorial = true
-    state.pictures = {}
-    for _, name in ipairs({ "doctor", "nurse", "handyman", "receptionist", "build",
-        "town_map", "casebook", "status", "policy" }) do
-      state.pictures[name] = self:spritePicture(name)
-    end
     state.can_continue = #saves > 0
     self.levels = self:findLevels()
     state.levels = self.levels

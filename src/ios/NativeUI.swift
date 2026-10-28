@@ -527,7 +527,6 @@ struct NativeState: Codable {
   var canTutorial: Bool?
   var campaigns: [Campaign]?
   var rooms: [RoomOption]?
-  var pictures: [String: String]?
   var levels: [Level]?
   var canContinue: Bool?
 }

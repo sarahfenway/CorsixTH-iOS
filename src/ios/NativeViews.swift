@@ -410,8 +410,6 @@ struct MainMenuCard: View {
   // own: a NavigationStack pads the card for the notch it doesn't touch.)
   @State private var page: String?
 
-  private func picture(_ name: String) -> String? { model.state.pictures?[name] }
-
   private let titles = [
     "new_game": "New Game", "campaigns": "Campaigns", "levels": "Single Levels",
     "load": "Load Game", "settings": "Settings",
@@ -467,55 +465,46 @@ struct MainMenuCard: View {
           Button {
             NativeUI.post("continue")
           } label: {
-            MenuRow(title: "Continue", picture: picture("status"), symbol: "play.fill")
+            MenuRow(title: "Continue", symbol: "play.fill")
           }
         }
         Button { open("new_game") } label: {
-          MenuRow(title: "New Game", picture: picture("build"), symbol: "cross.case", more: true)
+          MenuRow(title: "New Game", symbol: "cross.case", more: true)
         }
         if !(model.state.campaigns ?? []).isEmpty {
           Button { open("campaigns") } label: {
-            MenuRow(title: "Campaigns", picture: picture("town_map"), symbol: "map", more: true)
+            MenuRow(title: "Campaigns", symbol: "map", more: true)
           }
         }
         if !(model.state.levels ?? []).isEmpty {
           Button { open("levels") } label: {
-            MenuRow(title: "Single Levels", picture: picture("casebook"), symbol: "building.2", more: true)
+            MenuRow(title: "Single Levels", symbol: "building.2", more: true)
           }
         }
         Button { open("load") } label: {
-          MenuRow(title: "Load Game", picture: picture("policy"), symbol: "folder", more: true)
+          MenuRow(title: "Load Game", symbol: "folder", more: true)
         }
         Button { open("settings") } label: {
-          MenuRow(title: "Settings", picture: nil, symbol: "gearshape", more: true)
+          MenuRow(title: "Settings", symbol: "gearshape", more: true)
         }
-      } header: {
-        StaffBanner(model: model).textCase(nil)
       }
     }
+    .listStyle(.plain)
   }
 }
 
-//! A menu row with a picture from the game's art (or a symbol without one).
 struct MenuRow: View {
   let title: String
-  let picture: String?
   let symbol: String
   var more = false  // Shows a chevron: the row opens a page.
 
   var body: some View {
     HStack(spacing: 14) {
-      if picture != nil {
-        GamePicture(path: picture)
-          .frame(width: 32, height: 32)
-          .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-      } else {
-        Image(systemName: symbol)
-          .font(.title3)
-          .frame(width: 32, height: 32)
-          .foregroundStyle(.tint)
-      }
-      Text(title).foregroundStyle(.primary)
+      Image(systemName: symbol)
+        .font(.title3)
+        .frame(width: 32, height: 32)
+        .foregroundStyle(Color.accentColor)
+      Text(title)
       if more {
         Spacer()
         Image(systemName: "chevron.right")
@@ -528,27 +517,6 @@ struct MenuRow: View {
   }
 }
 
-//! The four kinds of staff, as the game's hire window pictures them.
-struct StaffBanner: View {
-  @ObservedObject var model: NativeModel
-
-  var body: some View {
-    let names = ["doctor", "nurse", "handyman", "receptionist"]
-    let paths = names.compactMap { model.state.pictures?[$0] }
-    if paths.count == names.count {
-      HStack(spacing: 10) {
-        ForEach(paths, id: \.self) { path in
-          GamePicture(path: path)
-            .frame(height: 58)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, 6)
-    }
-  }
-}
-
 struct NewGameView: View {
   @EnvironmentObject var model: NativeModel
   @State private var difficulty = ""
@@ -556,10 +524,6 @@ struct NewGameView: View {
 
   var body: some View {
     Form {
-      Section {
-      } header: {
-        StaffBanner(model: model).textCase(nil)
-      }
       if let difficulties = model.state.difficulties, difficulties.count > 1 {
         Picker("Difficulty", selection: $difficulty) {
           ForEach(difficulties) { Text($0.title).tag($0.id) }
