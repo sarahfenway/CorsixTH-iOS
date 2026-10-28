@@ -1,0 +1,13 @@
+# The Quick Build planner's "can a room go here" rule agrees with the
+# engine's own blueprint check (UIEditRoom:setBlueprintRect) across level 1.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 500
+lua TheApp.ui:getWindow(UIInformation):close()
+lua local planner = corsixth.require("ios.room_planner"); local app = TheApp; local ui = app.ui; local gp = app.rooms and nil; for _, d in pairs(ui.hospital.room_discoveries) do if d.room.id == "gp" then gp = d.room end end; local edit = UIEditRoom(ui, gp); ui:addWindow(edit); local player = ui.hospital:getPlayerIndex(); local map = app.map; local checked, bad, valid = 0, 0, 0; for y = 2, map.height - 6, 2 do for x = 2, map.width - 6, 2 do edit:setBlueprintRect(x, y, 4, 4); local engine = edit.confirm_button.enabled and true or false; local mine = planner.rectOk(app, x, y, 4, 4, player); checked = checked + 1; if engine then valid = valid + 1 end; if engine ~= mine then bad = bad + 1; if bad < 5 then print(("mismatch at %d,%d engine=%s planner=%s"):format(x, y, tostring(engine), tostring(mine))) end end end end; edit:cancel(); rawset(_G, "auto_bad", bad); return ("checked %d, valid %d, mismatches %d"):format(checked, valid, bad)
+expect rawget(_G, "auto_bad") == 0
+expect TheApp.ui:getWindow(UIEditRoom) == nil
+lua local planner = corsixth.require("ios.room_planner"); local ui = TheApp.ui; local gp; for _, d in pairs(ui.hospital.room_discoveries) do if d.room.id == "gp" then gp = d.room end end; local cx, cy = ui:ScreenToWorld(TheApp.config.width / 2, TheApp.config.height / 2); local r = planner.findRect(TheApp, gp, math.floor(cx), math.floor(cy), ui.hospital:getPlayerIndex()); rawset(_G, "auto_rect", r); return r and ("%d,%d %dx%d"):format(r.x, r.y, r.w, r.h) or "none"
+expect rawget(_G, "auto_rect") ~= nil
+lua local planner = corsixth.require("ios.room_planner"); local r = rawget(_G, "auto_rect"); local doors = planner.doorCandidates(TheApp, r, r.x, r.y, TheApp.ui.hospital:getPlayerIndex()); return #doors .. " door candidates, first " .. doors[1].x .. "," .. doors[1].y .. " " .. doors[1].wall
