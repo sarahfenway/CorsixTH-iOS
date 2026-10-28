@@ -160,6 +160,10 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
       controller.modalTransitionStyle = .crossDissolve
       controller.view.backgroundColor = .clear
       controller.isModalInPresentation = true
+      // The card sits in the middle, clear of the notch; don't pad for it.
+      if #available(iOS 16.4, *) {
+        controller.safeAreaRegions = []
+      }
     case .sheet:
       controller.modalPresentationStyle = .formSheet
       controller.presentationController?.delegate = self
@@ -431,6 +435,29 @@ final class NativeModel: ObservableObject {
 struct NamedOption: Codable, Hashable, Identifiable {
   var id: String
   var title: String
+  var image: String?  // A picture from the game's art (PNG path), if any.
+}
+
+//! Pictures made from the game's art (lua/native_ui.lua) for UIKit, scaled
+//! up with sharp pixels like the game itself.
+enum GameArt {
+  private static var cache: [String: UIImage] = [:]
+
+  static func image(_ path: String?, height: CGFloat) -> UIImage? {
+    guard let path = path else { return nil }
+    let key = "\(path)@\(height)"
+    if let image = cache[key] { return image }
+    guard let source = UIImage(contentsOfFile: path), source.size.height > 0 else { return nil }
+    let size = CGSize(width: (source.size.width * height / source.size.height).rounded(), height: height)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = UIScreen.main.scale
+    let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+      context.cgContext.interpolationQuality = .none
+      source.draw(in: CGRect(origin: .zero, size: size))
+    }.withRenderingMode(.alwaysOriginal)
+    cache[key] = image
+    return image
+  }
 }
 
 struct SaveFile: Codable, Hashable, Identifiable {
@@ -500,6 +527,7 @@ struct NativeState: Codable {
   var canTutorial: Bool?
   var campaigns: [Campaign]?
   var rooms: [RoomOption]?
+  var pictures: [String: String]?
   var levels: [Level]?
   var canContinue: Bool?
 }

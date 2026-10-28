@@ -4,6 +4,9 @@ controls direct
 wait_until 30000 require("sdl").native.screen() == "main_menu"
 wait 1000
 screenshot 1_main_menu
+# The main menu's pictures come from the game's own art.
+lua local n = 0; for _, path in pairs(TheApp.native:state().pictures or {}) do if lfs.attributes(path, "size") then n = n + 1 end end; rawset(_G, "auto_pics", n); return n
+expect rawget(_G, "auto_pics") == 9
 # SwiftUI rows can't be tapped by scripts (no accessibility tree without
 # VoiceOver), so send what the New Game screen's Start button sends.
 lua require("sdl").native.post("new_game", '{"difficulty":"easy","tutorial":false}')
@@ -11,6 +14,9 @@ wait_until 30000 TheApp.world ~= nil
 wait 1500
 expect require("sdl").native.screen() == nil
 screenshot 2_in_game
+# So do the toolbar's tool buttons and the Hospital menu.
+lua local s = TheApp.native:toolbarState(); local n = 0; for _, path in pairs(s.icons) do if lfs.attributes(path, "size") then n = n + 1 end end; for _, w in ipairs(s.windows) do if w.image and lfs.attributes(w.image, "size") then n = n + 1 end end; rawset(_G, "auto_icons", n); return n
+expect rawget(_G, "auto_icons") == 13
 # Close the level's introduction (still Theme Hospital's own window).
 expect TheApp.ui:getWindow(UIInformation) ~= nil
 lua TheApp.ui:getWindow(UIInformation):close()

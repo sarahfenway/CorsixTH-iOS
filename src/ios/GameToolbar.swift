@@ -17,6 +17,7 @@ struct ToolbarState: Decodable {
   var speed = "Normal"
   var speeds: [NamedOption] = []
   var windows: [NamedOption] = []
+  var icons: [String: String] = [:]  // Game art for the tool buttons, by tool id.
 
   init() {}
 
@@ -30,10 +31,11 @@ struct ToolbarState: Decodable {
     speed = (try? c.decodeIfPresent(String.self, forKey: .speed)) ?? speed
     speeds = (try? c.decodeIfPresent([NamedOption].self, forKey: .speeds)) ?? speeds
     windows = (try? c.decodeIfPresent([NamedOption].self, forKey: .windows)) ?? windows
+    icons = (try? c.decodeIfPresent([String: String].self, forKey: .icons)) ?? icons
   }
 
   private enum CodingKeys: String, CodingKey {
-    case money, date, reputation, messages, speed, speeds, windows
+    case money, date, reputation, messages, speed, speeds, windows, icons
   }
 }
 
@@ -48,6 +50,7 @@ final class GameToolbar {
   private let hospitalButton = UIButton(type: .system)
   private let speedButton = UIButton(type: .system)
   private var state = ToolbarState()
+  private var toolButtons: [String: UIButton] = [:]
 
   init(in view: UIView) {
     parent = view
@@ -93,6 +96,7 @@ final class GameToolbar {
     configure(speedButton, symbol: "play.fill", label: "Game Speed", action: nil)
     speedButton.showsMenuAsPrimaryAction = true
     let menu = button(symbol: "ellipsis.circle", label: "Menu") { NativeUI.post("menu_button") }
+    toolButtons = ["build": build, "furnish": furnish, "edit": edit, "hire": hire]
     let separator = UIView()
     separator.backgroundColor = UIColor.label.withAlphaComponent(0.2)
     separator.widthAnchor.constraint(equalToConstant: 1).isActive = true
@@ -151,10 +155,22 @@ final class GameToolbar {
     messageButton.isHidden = new.messages == 0
     messageButton.accessibilityValue = "\(new.messages) unread"
 
+    // The game's own button art where Lua has made it; symbols otherwise.
+    for (tool, button) in toolButtons {
+      if let image = GameArt.image(new.icons[tool], height: 30) {
+        button.setImage(image, for: .normal)
+        button.imageView?.layer.cornerRadius = 5
+        button.imageView?.clipsToBounds = true
+      }
+    }
     hospitalButton.menu = UIMenu(
       title: "Hospital",
       children: new.windows.map { window in
-        UIAction(title: window.title, image: UIImage(systemName: GameToolbar.symbol(for: window.id))) { _ in
+        UIAction(
+          title: window.title,
+          image: GameArt.image(window.image, height: 26)
+            ?? UIImage(systemName: GameToolbar.symbol(for: window.id))
+        ) { _ in
           NativeUI.post("open_window", ["id": window.id])
         }
       })

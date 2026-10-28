@@ -406,48 +406,145 @@ struct VolumeSlider: View {
 
 struct MainMenuCard: View {
   @EnvironmentObject var model: NativeModel
+  // The page showing: nil for the menu itself. (Simple navigation of our
+  // own: a NavigationStack pads the card for the notch it doesn't touch.)
+  @State private var page: String?
+
+  private func picture(_ name: String) -> String? { model.state.pictures?[name] }
+
+  private let titles = [
+    "new_game": "New Game", "campaigns": "Campaigns", "levels": "Single Levels",
+    "load": "Load Game", "settings": "Settings",
+  ]
 
   var body: some View {
     ZStack {
       Color.black.opacity(0.25).ignoresSafeArea()
-      NavigationStack {
-        List {
-          Section {
-            if model.state.canContinue ?? false {
+      VStack(spacing: 0) {
+        ZStack {
+          Text(page.flatMap { titles[$0] } ?? "Theme Hospital").font(.headline)
+          if page != nil {
+            HStack {
               Button {
-                NativeUI.post("continue")
+                withAnimation(.easeInOut(duration: 0.2)) { page = nil }
               } label: {
-                Label("Continue", systemImage: "play.fill")
+                Label("Back", systemImage: "chevron.left").labelStyle(.titleAndIcon)
               }
-            }
-            NavigationLink { NewGameView() } label: {
-              Label("New Game", systemImage: "cross.case")
-            }
-            if !(model.state.campaigns ?? []).isEmpty {
-              NavigationLink { CampaignListView() } label: {
-                Label("Campaigns", systemImage: "map")
-              }
-            }
-            if !(model.state.levels ?? []).isEmpty {
-              NavigationLink { LevelListView() } label: {
-                Label("Single Levels", systemImage: "building.2")
-              }
-            }
-            NavigationLink { SaveLoadView(mode: .load) } label: {
-              Label("Load Game", systemImage: "folder")
-            }
-            NavigationLink { SettingsView() } label: {
-              Label("Settings", systemImage: "gearshape")
+              Spacer()
             }
           }
         }
-        .navigationTitle("Theme Hospital")
-        .navigationBarTitleDisplayMode(.inline)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        Group {
+          switch page {
+          case "new_game": NewGameView()
+          case "campaigns": CampaignListView()
+          case "levels": LevelListView()
+          case "load": SaveLoadView(mode: .load)
+          case "settings": SettingsView()
+          default: menu
+          }
+        }
+        .transition(.move(edge: page == nil ? .leading : .trailing))
       }
-      .frame(maxWidth: 460, maxHeight: 420)
+      .background(Color(uiColor: .systemGroupedBackground))
+      .frame(maxWidth: 460, maxHeight: 440)
       .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
       .shadow(radius: 20)
       .padding()
+    }
+  }
+
+  private func open(_ name: String) {
+    withAnimation(.easeInOut(duration: 0.2)) { page = name }
+  }
+
+  private var menu: some View {
+    List {
+      Section {
+        if model.state.canContinue ?? false {
+          Button {
+            NativeUI.post("continue")
+          } label: {
+            MenuRow(title: "Continue", picture: picture("status"), symbol: "play.fill")
+          }
+        }
+        Button { open("new_game") } label: {
+          MenuRow(title: "New Game", picture: picture("build"), symbol: "cross.case", more: true)
+        }
+        if !(model.state.campaigns ?? []).isEmpty {
+          Button { open("campaigns") } label: {
+            MenuRow(title: "Campaigns", picture: picture("town_map"), symbol: "map", more: true)
+          }
+        }
+        if !(model.state.levels ?? []).isEmpty {
+          Button { open("levels") } label: {
+            MenuRow(title: "Single Levels", picture: picture("casebook"), symbol: "building.2", more: true)
+          }
+        }
+        Button { open("load") } label: {
+          MenuRow(title: "Load Game", picture: picture("policy"), symbol: "folder", more: true)
+        }
+        Button { open("settings") } label: {
+          MenuRow(title: "Settings", picture: nil, symbol: "gearshape", more: true)
+        }
+      } header: {
+        StaffBanner(model: model).textCase(nil)
+      }
+    }
+  }
+}
+
+//! A menu row with a picture from the game's art (or a symbol without one).
+struct MenuRow: View {
+  let title: String
+  let picture: String?
+  let symbol: String
+  var more = false  // Shows a chevron: the row opens a page.
+
+  var body: some View {
+    HStack(spacing: 14) {
+      if picture != nil {
+        GamePicture(path: picture)
+          .frame(width: 32, height: 32)
+          .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+      } else {
+        Image(systemName: symbol)
+          .font(.title3)
+          .frame(width: 32, height: 32)
+          .foregroundStyle(.tint)
+      }
+      Text(title).foregroundStyle(.primary)
+      if more {
+        Spacer()
+        Image(systemName: "chevron.right")
+          .font(.footnote.weight(.semibold))
+          .foregroundStyle(.tertiary)
+      }
+    }
+    // Rows that open a page read like navigation rows, not like buttons.
+    .tint(more ? Color.primary : Color.accentColor)
+  }
+}
+
+//! The four kinds of staff, as the game's hire window pictures them.
+struct StaffBanner: View {
+  @ObservedObject var model: NativeModel
+
+  var body: some View {
+    let names = ["doctor", "nurse", "handyman", "receptionist"]
+    let paths = names.compactMap { model.state.pictures?[$0] }
+    if paths.count == names.count {
+      HStack(spacing: 10) {
+        ForEach(paths, id: \.self) { path in
+          GamePicture(path: path)
+            .frame(height: 58)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 6)
     }
   }
 }
@@ -459,6 +556,10 @@ struct NewGameView: View {
 
   var body: some View {
     Form {
+      Section {
+      } header: {
+        StaffBanner(model: model).textCase(nil)
+      }
       if let difficulties = model.state.difficulties, difficulties.count > 1 {
         Picker("Difficulty", selection: $difficulty) {
           ForEach(difficulties) { Text($0.title).tag($0.id) }

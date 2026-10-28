@@ -76,23 +76,23 @@ local speeds = {
 
 -- In-game windows a tap away from the menu.
 local hospital_windows = {
-  { id = "staff", title = "Staff Management",
+  { id = "staff", picture = "staff", title = "Staff Management",
     open = function(ui) ui.bottom_panel:dialogStaffManagement(true) end },
-  { id = "town_map", title = "Town Map",
+  { id = "town_map", picture = "town_map", title = "Town Map",
     open = function(ui) ui.bottom_panel:dialogTownMap(true) end },
-  { id = "research", title = "Research",
+  { id = "research", picture = "research", title = "Research",
     open = function(ui) ui.bottom_panel:dialogResearch(true) end },
-  { id = "casebook", title = "Casebook",
+  { id = "casebook", picture = "casebook", title = "Casebook",
     open = function(ui) ui.bottom_panel:dialogDrugCasebook(true) end },
-  { id = "status", title = "Hospital Status",
+  { id = "status", picture = "status", title = "Hospital Status",
     open = function(ui) ui.bottom_panel:dialogStatus(true) end },
-  { id = "charts", title = "Graphs",
+  { id = "charts", picture = "charts", title = "Graphs",
     open = function(ui) ui.bottom_panel:dialogCharts(true) end },
-  { id = "policy", title = "Policy",
+  { id = "policy", picture = "policy", title = "Policy",
     open = function(ui) ui.bottom_panel:dialogPolicy(true) end },
-  { id = "bank", title = "Bank Manager",
+  { id = "bank", picture = "bank", title = "Bank Manager",
     open = function(ui) ui.bottom_panel:dialogBankManager(true) end },
-  { id = "statement", title = "Bank Statement",
+  { id = "statement", picture = "bank", title = "Bank Statement",
     open = function(ui) ui.bottom_panel:dialogBankStats(true) end },
   { id = "adviser_history", title = "Adviser Messages",
     open = function(ui) ui:addWindow(UIAdviserHistory(ui)) end },
@@ -399,6 +399,59 @@ function NativeUI:roomPicture(room)
   return path
 end
 
+-- Pictures from the game's sprite sheets: {sheet folder, sheet, sprite, crop}.
+-- The crop (x, y, w, h) is the part of the sprite to keep.
+local sprites = {
+  -- Bottom panel buttons (UIBottomPanel:drawPanels), the face of each button.
+  bank = { "Data", "Panel02V", 1, { 6, 6, 35, 36 } },
+  build = { "Data", "Panel02V", 4, { 6, 6, 35, 36 } },
+  furnish = { "Data", "Panel02V", 6, { 1, 6, 35, 36 } },
+  edit = { "Data", "Panel02V", 8, { 1, 6, 35, 36 } },
+  hire = { "Data", "Panel02V", 10, { 1, 6, 35, 36 } },
+  staff = { "Data", "Panel02V", 15, { 6, 6, 35, 36 } },
+  town_map = { "Data", "Panel02V", 17, { 1, 6, 35, 36 } },
+  casebook = { "Data", "Panel02V", 19, { 1, 6, 35, 36 } },
+  research = { "Data", "Panel02V", 21, { 1, 6, 35, 36 } },
+  status = { "Data", "Panel02V", 23, { 1, 6, 35, 36 } },
+  charts = { "Data", "Panel02V", 25, { 1, 6, 35, 36 } },
+  policy = { "Data", "Panel02V", 27, { 1, 6, 35, 36 } },
+  -- Staff portraits from the hire window (UIHireStaff), without the count box.
+  doctor = { "QData", "Req11V", 264, { 5, 7, 30, 37 } },
+  nurse = { "QData", "Req11V", 266, { 5, 7, 30, 37 } },
+  handyman = { "QData", "Req11V", 268, { 5, 7, 30, 37 } },
+  receptionist = { "QData", "Req11V", 270, { 5, 7, 30, 37 } },
+}
+
+--! A picture of one of the game's sprites (see `sprites`). Returns the PNG's
+-- path, or nil.
+function NativeUI:spritePicture(name)
+  if not name then
+    return nil
+  end
+  self.pictures = self.pictures or {}
+  if self.pictures[name] ~= nil then
+    return self.pictures[name] or nil
+  end
+  local info = sprites[name]
+  local path = info and self:pictureDir() .. ("sprite_%s_v2.png"):format(name)
+  if path and not lfs.attributes(path, "size") then
+    local ok, err = pcall(function()
+      local sheet = self.app.gfx:loadSpriteTable(info[1], info[2], true)
+      local crop = info[4]
+      local done, why = SDL.native.renderToPNG(path, crop[3], crop[4], function()
+        sheet:draw(self.app.video, info[3], -crop[1], -crop[2])
+      end)
+      if not done then error(why) end
+    end)
+    if not ok then
+      print("Native UI: couldn't make a picture of " .. name .. ": " .. tostring(err))
+      path = nil
+    end
+  end
+  self.pictures[name] = path or false
+  return path
+end
+
 --! The rooms the player can build now, as UIBuildRoom lists them.
 function NativeUI:roomList()
   local app = self.app
@@ -463,6 +516,11 @@ function NativeUI:state()
     state.difficulties = difficulties
     state.default_difficulty = "full"
     state.can_tutorial = true
+    state.pictures = {}
+    for _, name in ipairs({ "doctor", "nurse", "handyman", "receptionist", "build",
+        "town_map", "casebook", "status", "policy" }) do
+      state.pictures[name] = self:spritePicture(name)
+    end
     state.can_continue = #saves > 0
     self.levels = self:findLevels()
     state.levels = self.levels
@@ -493,9 +551,14 @@ function NativeUI:toolbarState()
   local messages = panel and (#panel.message_windows + #panel.message_queue) or 0
   local windows = {}
   for _, w in ipairs(hospital_windows) do
-    windows[#windows + 1] = { id = w.id, title = w.title }
+    windows[#windows + 1] = { id = w.id, title = w.title, image = self:spritePicture(w.picture) }
+  end
+  local icons = {}
+  for _, tool in ipairs({ "build", "furnish", "edit", "hire" }) do
+    icons[tool] = self:spritePicture(tool)
   end
   return {
+    icons = icons,
     money = format_money(hospital.balance),
     date = _S.date_format.daymonth:format(date:dayOfMonth(), date:monthOfYear()),
     reputation = (hospital.reputation or 500) / 1000,
