@@ -40,6 +40,8 @@ struct lua_State;
                                         table {x, y} (in the current coords)
       long_press_at <lua expression>    the same, held for 0.8 s
       drag <x1> <y1> <x2> <y2> <ms>     one finger
+      drag_at <lua expression>          one finger over 0.4 s, where a Lua
+                                        expression says: {x1, y1, x2, y2}
       twofinger_tap <x> <y>
       pinch <x> <y> <scale>             two fingers moving apart (scale > 1)
       pan <dx> <dy> [wobble]            two fingers moving together (their

@@ -83,8 +83,9 @@ int screen_h = 0;
 gesture_recogniser direct;
 trackpad_recogniser trackpad;
 bool trackpad_mode = true;
-// Placing things (native room editor): direct touches with the pointer raised
-// above the finger, so what's being placed isn't hidden under it.
+// Placing things (native room editor): direct touches; a drag aims with the
+// pointer raised above the finger, so what's being placed isn't hidden under
+// it, and lifting places it. Taps place where they land.
 bool placement_mode = false;
 bool trackpad_before_placement = true;
 constexpr float placement_offset_points = 40.0f;
@@ -129,9 +130,6 @@ bool finger_to_logical(const SDL_TouchFingerEvent& f, int* x, int* y) {
   if (lw > 0 && lh > 0) {
     logical_w = lw;
     logical_h = lh;
-    if (placement_mode) {
-      ly -= placement_offset();
-    }
     lx = std::clamp(lx, 0.0f, static_cast<float>(lw - 1));
     ly = std::clamp(ly, 0.0f, static_cast<float>(lh - 1));
   }
@@ -451,8 +449,11 @@ void set_placement_mode(bool on) {
     trackpad_before_placement = trackpad_mode;
     set_controls("direct");
     placement_mode = true;
+    // Dragging aims above the finger; taps act where they land.
+    direct.set_aim_offset(static_cast<int>(std::lround(placement_offset())));
   } else {
     placement_mode = false;
+    direct.set_aim_offset(0);
     set_controls(trackpad_before_placement ? "trackpad" : "direct");
   }
 }

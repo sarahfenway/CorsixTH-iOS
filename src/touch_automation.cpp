@@ -317,6 +317,25 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
     } else {
       add_finger(SDL_FINGERUP, f, p, now + 50);
     }
+  } else if (command == "drag_at") {
+    // A one-finger drag over 400 ms; where from Lua: {x1, y1, x2, y2}.
+    bool truthy = false;
+    std::string result;
+    if (rest.empty() ||
+        !run_lua(L,
+                 "local t = (" + rest +
+                     ") return t[1] .. ' ' .. t[2] .. ' ' .. t[3] .. ' ' .. t[4]",
+                 &truthy, &result) ||
+        !parse_numbers(result, 4, &n)) {
+      finish(false, "can't work out where: " + result);
+      return false;
+    }
+    point a = to_window(n[0], n[1]);
+    point b = to_window(n[2], n[3]);
+    SDL_FingerID f = s.next_finger++;
+    add_finger(SDL_FINGERDOWN, f, a, now);
+    add_moves(f, a, b, now + 16, 400);
+    add_finger(SDL_FINGERUP, f, b, now + 432);
   } else if (command == "drag") {
     if (!parse_numbers(rest, 5, &n)) {
       return bad("drag <x1> <y1> <x2> <y2> <ms>");

@@ -194,7 +194,10 @@ void gesture_recogniser::finger_move(int64_t finger, int x, int y,
   }
   switch (st) {
     case state::pending:
-      if (moved_far(origin_x, origin_y, x, y)) {
+      if (moved_far(origin_x, origin_y, x, y) && aim_offset > 0) {
+        st = state::aiming;
+        out.push_back({mouse_action::kind::move, 0, x, std::max(0, y - aim_offset)});
+      } else if (moved_far(origin_x, origin_y, x, y)) {
         if (now - down_time >= cfg.drag_delay_ms) {
           out.push_back(
               {mouse_action::kind::press, button_left, origin_x, origin_y});
@@ -208,6 +211,9 @@ void gesture_recogniser::finger_move(int64_t finger, int x, int y,
     case state::hovering:
     case state::dragging:
       out.push_back({mouse_action::kind::move, 0, x, y});
+      break;
+    case state::aiming:
+      out.push_back({mouse_action::kind::move, 0, x, std::max(0, y - aim_offset)});
       break;
     default:
       break;
@@ -268,6 +274,13 @@ void gesture_recogniser::finger_up(int64_t finger, int x, int y, uint32_t now,
       case state::hovering:
         out.push_back({mouse_action::kind::move, 0, x, y});
         break;
+      case state::aiming: {
+        int aim_y = std::max(0, y - aim_offset);
+        out.push_back({mouse_action::kind::move, 0, x, aim_y});
+        out.push_back({mouse_action::kind::press, button_left, x, aim_y});
+        out.push_back({mouse_action::kind::release, button_left, x, aim_y});
+        break;
+      }
       default:
         break;
     }

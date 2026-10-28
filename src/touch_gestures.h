@@ -76,6 +76,8 @@ class pinch_tracker {
                                       an object before tapping to place it)
     - long press                   -> right click
     - two-finger tap               -> right click
+    - with an aim offset (placing things): drag -> the pointer follows above
+      the finger, lift -> left click there
     - two-finger drag              -> middle button drag (pans the map)
     - pinch                        -> zoom, once the spacing has changed by
                                       more than pinch_threshold
@@ -103,11 +105,16 @@ class gesture_recogniser {
                  std::vector<mouse_action>& out);
   //! Handles time based gestures (long press). Call regularly.
   void tick(uint32_t now, std::vector<mouse_action>& out);
+  //! Placing things: with an offset, a one-finger drag aims `offset` pixels
+  //! above the finger (so the finger doesn't hide what's being placed) and
+  //! lifting clicks there; taps and long presses still act where they land.
+  //! 0 turns it off.
+  void set_aim_offset(int offset) { aim_offset = offset; }
   //! Forget all touches, releasing any button that is held.
   void cancel(std::vector<mouse_action>& out);
 
  private:
-  enum class state { idle, pending, hovering, dragging, consumed, multi };
+  enum class state { idle, pending, hovering, dragging, aiming, consumed, multi };
   struct finger_info {
     int64_t id;
     int start_x;
@@ -136,6 +143,7 @@ class gesture_recogniser {
   int pan_start_y{0};
   int tap_x{0};
   int tap_y{0};
+  int aim_offset{0};
 };
 
 //! Turns touches into mouse actions with the screen acting as a trackpad: the

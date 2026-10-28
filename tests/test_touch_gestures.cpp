@@ -405,6 +405,64 @@ int main() {
     }
   }
 
+  // Placing things (aim offset on): a tap places right where it lands; a drag
+  // aims the item above the finger, so it isn't hidden, and lifting drops it
+  // there; a long press is still a right click where it lands (picks an item
+  // up); the aim stays on screen.
+  {
+    gesture_recogniser g;
+    g.set_aim_offset(40);
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 200, 1000, out);
+    g.finger_up(1, 102, 201, 1080, out);
+    expect("placing: a tap places where it lands", out,
+           "move(100,200) press1(100,200) release1(100,200) ");
+  }
+  {
+    gesture_recogniser g;
+    g.set_aim_offset(40);
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 200, 1000, out);
+    g.finger_move(1, 130, 200, 1040, out);
+    g.finger_move(1, 160, 210, 1300, out);  // a slow drag: still aiming
+    g.finger_up(1, 160, 210, 1400, out);
+    expect("placing: a drag aims above the finger and lifting drops it", out,
+           "move(100,200) move(130,160) move(160,170) move(160,170) "
+           "press1(160,170) release1(160,170) ");
+  }
+  {
+    gesture_recogniser g;
+    g.set_aim_offset(40);
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 200, 1000, out);
+    g.tick(1600, out);
+    g.finger_up(1, 100, 200, 1700, out);
+    expect("placing: a long press right-clicks where it lands", out,
+           "move(100,200) press3(100,200) release3(100,200) ");
+  }
+  {
+    gesture_recogniser g;
+    g.set_aim_offset(40);
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 20, 1000, out);
+    g.finger_move(1, 100, 50, 1040, out);
+    g.finger_up(1, 100, 50, 1100, out);
+    expect("placing: the aim stays on screen near the top", out,
+           "move(100,20) move(100,10) move(100,10) press1(100,10) "
+           "release1(100,10) ");
+  }
+  {
+    gesture_recogniser g;
+    g.set_aim_offset(40);
+    g.set_aim_offset(0);  // Placing over: back to the usual direct touches.
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 200, 1000, out);
+    g.finger_move(1, 130, 200, 1040, out);
+    g.finger_up(1, 130, 200, 1100, out);
+    expect("placing off: a quick swipe only moves the pointer again", out,
+           "move(100,200) move(130,200) move(130,200) ");
+  }
+
   // A two-finger pan where the fingers drift a little closer and further
   // apart (as real fingers do) must not zoom, and must still pan.
   {

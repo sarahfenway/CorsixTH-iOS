@@ -69,9 +69,10 @@ bool handle_event(const SDL_Event& e);
 //! cursor like a laptop trackpad) or "direct" (click where you touch).
 void set_controls(const char* name);
 
-//! Placing things: touches act directly where the finger is, but with the
-//! pointer about 40 points above it so the finger doesn't hide what's being
-//! placed. Turning it off restores the player's own touch controls.
+//! Placing things: touches act directly. A tap places where it lands; a drag
+//! aims with the pointer about 40 points above the finger, so the finger
+//! doesn't hide what's being placed, and lifting places it there. Turning it
+//! off restores the player's own touch controls.
 void set_placement_mode(bool on);
 bool placement_mode_on();
 
