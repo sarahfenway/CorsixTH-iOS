@@ -1,7 +1,8 @@
 // Copyright (c) 2026 CorsixTH iOS port contributors. MIT licence (see
 // src/native_bridge.h for the full text).
 //
-// The in-game chrome: a status pill (money, date, fax messages) at the top left
+// The in-game chrome: a status pill (money, date, fax messages) at the top left,
+// the adviser's messages at the bottom left
 // and a toolbar (build, furnish, edit, hire, hospital screens, speed, menu)
 // at the top right, floating over the game in Liquid Glass. They replace
 // Theme Hospital's bottom panel and menu bar. Lua sends the state
@@ -20,12 +21,20 @@ struct FaxState: Decodable, Hashable {
   var timeLeft: Double?  // 0...1 for faxes that expire (emergencies, VIPs...)
 }
 
+//! What the adviser is saying (while the game shows his speech bubble).
+struct AdviserState: Decodable, Hashable {
+  var text: String
+  var more: Int  // Messages queued after this one.
+  var face: String?
+}
+
 struct ToolbarState: Decodable {
   var money = ""
   var date = ""
   var reputation: Double = 0  // 0...1
   var faxes: [FaxState] = []
   var faxesWaiting = 0
+  var adviser: AdviserState?
   var speed = "Normal"
   var speeds: [NamedOption] = []
   var windows: [NamedOption] = []
@@ -41,6 +50,7 @@ struct ToolbarState: Decodable {
     reputation = (try? c.decodeIfPresent(Double.self, forKey: .reputation)) ?? reputation
     faxes = (try? c.decodeIfPresent([FaxState].self, forKey: .faxes)) ?? faxes
     faxesWaiting = (try? c.decodeIfPresent(Int.self, forKey: .faxesWaiting)) ?? faxesWaiting
+    adviser = try? c.decodeIfPresent(AdviserState.self, forKey: .adviser)
     speed = (try? c.decodeIfPresent(String.self, forKey: .speed)) ?? speed
     speeds = (try? c.decodeIfPresent([NamedOption].self, forKey: .speeds)) ?? speeds
     windows = (try? c.decodeIfPresent([NamedOption].self, forKey: .windows)) ?? windows
@@ -48,7 +58,7 @@ struct ToolbarState: Decodable {
   }
 
   private enum CodingKeys: String, CodingKey {
-    case money, date, reputation, faxes, faxesWaiting, speed, speeds, windows, icons
+    case money, date, reputation, faxes, faxesWaiting, adviser, speed, speeds, windows, icons
   }
 }
 
@@ -56,6 +66,11 @@ final class GameToolbar {
   private weak var parent: UIView?
   private let statusPill: UIVisualEffectView
   private let faxPill: UIVisualEffectView  // Below the status pill, while there are faxes.
+  private let adviserCard: UIVisualEffectView  // Bottom left, while the adviser talks.
+  private let adviserFace = UIImageView()
+  private let adviserText = UILabel()
+  private let adviserMore = UILabel()
+  private let adviserButton = UIButton(type: .custom)
   private let toolbar: UIVisualEffectView
   private let moneyLabel = UILabel()
   private let dateLabel = UILabel()
@@ -72,6 +87,7 @@ final class GameToolbar {
     parent = view
     statusPill = GameToolbar.glassView()
     faxPill = GameToolbar.glassView()
+    adviserCard = GameToolbar.glassView()
     toolbar = GameToolbar.glassView()
 
     // Status pill: money and reputation, date, unread messages.
@@ -135,7 +151,43 @@ final class GameToolbar {
     toolStack.translatesAutoresizingMaskIntoConstraints = false
     toolbar.contentView.addSubview(toolStack)
 
-    for pill in [statusPill, faxPill, toolbar] {
+    // The adviser: his face and what he's saying. Tap = next message (or he
+    // goes), long press = dismiss everything he still had to say; as clicking
+    // and right-clicking him in the game.
+    adviserFace.contentMode = .scaleAspectFit
+    adviserFace.layer.magnificationFilter = .nearest
+    adviserText.font = .preferredFont(forTextStyle: .subheadline)
+    adviserText.adjustsFontForContentSizeCategory = true
+    adviserText.numberOfLines = 0
+    adviserMore.font = .preferredFont(forTextStyle: .caption1)
+    adviserMore.textColor = .secondaryLabel
+    let adviserWords = UIStackView(arrangedSubviews: [adviserText, adviserMore])
+    adviserWords.axis = .vertical
+    adviserWords.spacing = 4
+    let adviserRow = UIStackView(arrangedSubviews: [adviserFace, adviserWords])
+    adviserRow.axis = .horizontal
+    adviserRow.alignment = .center
+    adviserRow.spacing = 10
+    adviserRow.isUserInteractionEnabled = false
+    adviserRow.translatesAutoresizingMaskIntoConstraints = false
+    adviserCard.contentView.addSubview(adviserRow)
+    adviserButton.translatesAutoresizingMaskIntoConstraints = false
+    adviserButton.addAction(UIAction { _ in NativeUI.post("adviser_next") }, for: .touchUpInside)
+    adviserButton.menu = UIMenu(children: [
+      UIAction(title: "Next", image: UIImage(systemName: "text.bubble")) { _ in
+        NativeUI.post("adviser_next")
+      },
+      UIAction(title: "Dismiss All", image: UIImage(systemName: "xmark"), attributes: .destructive) {
+        _ in NativeUI.post("adviser_dismiss")
+      },
+    ])
+    adviserButton.accessibilityLabel = "Adviser"
+    adviserButton.accessibilityHint = "Shows the next message, or dismisses the adviser"
+    adviserCard.contentView.addSubview(adviserButton)
+    adviserCard.layer.cornerRadius = 20
+    adviserCard.isHidden = true
+
+    for pill in [statusPill, faxPill, adviserCard, toolbar] {
       pill.translatesAutoresizingMaskIntoConstraints = false
       view.addSubview(pill)
     }
@@ -149,6 +201,22 @@ final class GameToolbar {
         equalTo: statusPill.contentView.trailingAnchor, constant: -10),
       statusStack.centerYAnchor.constraint(equalTo: statusPill.contentView.centerYAnchor),
       reputationBar.heightAnchor.constraint(equalToConstant: 3),
+
+      // Above where the editor's bar sits, so the two never overlap.
+      adviserCard.bottomAnchor.constraint(equalTo: guide.bottomAnchor, constant: -72),
+      adviserCard.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 8),
+      adviserCard.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+      adviserCard.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, multiplier: 0.6),
+      adviserRow.leadingAnchor.constraint(equalTo: adviserCard.contentView.leadingAnchor, constant: 10),
+      adviserRow.trailingAnchor.constraint(equalTo: adviserCard.contentView.trailingAnchor, constant: -14),
+      adviserRow.topAnchor.constraint(equalTo: adviserCard.contentView.topAnchor, constant: 10),
+      adviserRow.bottomAnchor.constraint(equalTo: adviserCard.contentView.bottomAnchor, constant: -10),
+      adviserFace.widthAnchor.constraint(equalToConstant: 44),
+      adviserFace.heightAnchor.constraint(equalToConstant: 52),
+      adviserButton.leadingAnchor.constraint(equalTo: adviserCard.contentView.leadingAnchor),
+      adviserButton.trailingAnchor.constraint(equalTo: adviserCard.contentView.trailingAnchor),
+      adviserButton.topAnchor.constraint(equalTo: adviserCard.contentView.topAnchor),
+      adviserButton.bottomAnchor.constraint(equalTo: adviserCard.contentView.bottomAnchor),
 
       faxPill.topAnchor.constraint(equalTo: statusPill.bottomAnchor, constant: 6),
       faxPill.leadingAnchor.constraint(equalTo: statusPill.leadingAnchor),
@@ -170,6 +238,7 @@ final class GameToolbar {
   func remove() {
     statusPill.removeFromSuperview()
     faxPill.removeFromSuperview()
+    adviserCard.removeFromSuperview()
     toolbar.removeFromSuperview()
   }
 
@@ -180,6 +249,7 @@ final class GameToolbar {
     statusPill.isHidden = hidden
     toolbar.isHidden = hidden
     faxPill.isHidden = hidden || state.faxes.isEmpty
+    adviserCard.isHidden = hidden || state.adviser == nil
   }
 
   func update(_ new: ToolbarState) {
@@ -190,6 +260,15 @@ final class GameToolbar {
     reputationBar.progressTintColor =
       new.reputation < 0.3 ? .systemRed : new.reputation < 0.5 ? .systemOrange : .systemGreen
     faxPill.isHidden = hidden || new.faxes.isEmpty
+    adviserCard.isHidden = hidden || new.adviser == nil
+    if let adviser = new.adviser {
+      adviserText.text = adviser.text
+      adviserMore.text = adviser.more > 0 ? "\(adviser.more) more – tap for the next" : nil
+      adviserMore.isHidden = adviser.more == 0
+      adviserFace.image = adviser.face.flatMap { UIImage(contentsOfFile: $0) }
+      adviserFace.isHidden = adviserFace.image == nil
+      adviserButton.accessibilityValue = adviser.text
+    }
     if shownFaxes != new.faxes {
       shownFaxes = new.faxes
       rebuildFaxes(new.faxes)

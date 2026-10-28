@@ -123,7 +123,9 @@ an envelope when a message (fax) is waiting. The toolbar at the top right has:
 
 While placing anything, tap where it should go, or drag: the item follows a little above your
 finger so you can see it, and lifting your finger puts it down. A long press on a placed item picks
-it up again. Fax messages appear under the money as the game's own icons (tap to open; long press to
+it up again. What the adviser says appears at the bottom left (tap for his next message; long press to dismiss
+them all; past ones are under Hospital > Adviser Messages). Fax messages appear under the money as
+the game's own icons (tap to open; long press to
 dismiss the ones you can), with a bar on those that run out. Text entry uses the iOS keyboard. On an iPad,
 a real trackpad or mouse works too, including right click.
 

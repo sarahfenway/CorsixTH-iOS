@@ -470,14 +470,15 @@ function NativeUI:roomPicture(room)
   return path
 end
 
--- Pictures from the game's sprite sheets: {sheet folder, sheet, sprite, crop}.
--- The crop (x, y, w, h) is the part of the sprite to keep.
 -- The hire window's background blues: the icons below sit on them, and
 -- shades show through the abacus's frame and under the computer.
 local panel_blue = { { 61, 174, 202 }, { 45, 146, 186 }, { 49, 154, 190 }, { 57, 166, 198 },
   { 36, 138, 178 }, { 69, 182, 206 }, { 28, 121, 170 }, { 0, 77, 113 }, { 0, 65, 109 },
   { 0, 93, 121 }, { 32, 130, 174 } }
 
+-- Pictures from the game's sprite sheets: {sheet folder, sheet, sprite, crop,
+-- colours to make see-through, version}. The crop (x, y, w, h) is the part of
+-- the sprite to keep (all of it if nil).
 local sprites = {
   -- Bottom panel buttons (UIBottomPanel:drawPanels), the face of each button.
   bank = { "Data", "Panel02V", 1, { 6, 6, 35, 36 } },
@@ -540,6 +541,40 @@ function NativeUI:spritePicture(name)
   end
   self.pictures[name] = path or false
   return path
+end
+
+--! A picture of the adviser, as the game shows him talking (UIAdviser).
+function NativeUI:adviserPicture()
+  local path = self:pictureDir() .. "adviser_v1.png"
+  if self.adviser_picture_failed then
+    return nil
+  end
+  if not lfs.attributes(path, "size") then
+    local anim = TH.animation()
+    anim:setAnimation(self.app.world.anims, 460, DrawFlags.Nearest)
+    -- A big canvas; the empty part is trimmed off.
+    local ok, err = SDL.native.renderToPNG(path, 200, 200, function()
+      anim:draw(self.app.video, 100, 120)
+    end)
+    if not ok then
+      print("Native UI: couldn't make a picture of the adviser: " .. tostring(err))
+      self.adviser_picture_failed = true
+      return nil
+    end
+  end
+  return path
+end
+
+--! What the adviser is saying, while the game has him saying it (his speech
+-- bubble), or nil. The game keeps his queue, timing and history as ever.
+function NativeUI:adviserState()
+  local adviser = self.app.ui and self.app.ui.adviser
+  if not adviser or not adviser.speech or (adviser.phase ~= 2 and adviser.phase ~= 3) then
+    return nil
+  end
+  -- Trailing "/"s are the game's blank lines.
+  local text = json.text(adviser.speech):gsub("/+$", "")
+  return { text = text, more = #adviser.queued_messages, face = self:adviserPicture() }
 end
 
 --! A picture of a job candidate's face, drawn by the game as the hire window
@@ -785,6 +820,7 @@ function NativeUI:toolbarState()
     reputation = (hospital.reputation or 500) / 1000,
     faxes = faxes,
     faxes_waiting = waiting,
+    adviser = self:adviserState(),
     speed = world:getCurrentSpeed(),
     speeds = speeds,
     windows = windows,
@@ -953,6 +989,31 @@ function actions.open_message(self, p)
   local icon = panel and panel.message_windows[p.index or 1]
   if icon then
     icon:openMessage()
+    self:updateToolbar(true)
+  end
+end
+
+--! The adviser's next message, or he goes away: as clicking him does.
+function actions.adviser_next(self)
+  local adviser = self.app.ui and self.app.ui.adviser
+  if adviser and adviser.phase ~= 0 and adviser.phase ~= 4 then
+    if #adviser.queued_messages > 0 then
+      adviser:talk()
+    else
+      adviser:hide()
+    end
+    self:updateToolbar(true)
+  end
+end
+
+--! The adviser goes away with everything he still had to say (it stays in
+-- his history): as right-clicking him does.
+function actions.adviser_dismiss(self)
+  local adviser = self.app.ui and self.app.ui.adviser
+  if adviser and adviser.phase ~= 0 and adviser.phase ~= 4 then
+    adviser:hide()
+    adviser:addQueuedMessagesToHistory()
+    adviser.queued_messages = {}
     self:updateToolbar(true)
   end
 end

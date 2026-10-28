@@ -1,0 +1,26 @@
+# The adviser is drawn as part of the bottom panel, which is hidden on iOS, so
+# what he says shows in a native card: tapping it is clicking him (the next
+# message, or he goes), Dismiss All is right-clicking him. The game keeps his
+# queue, timing and history.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua local a = TheApp.ui.adviser; a:say({ text = "First test message from the adviser." }, false, true); a:say({ text = "Second test message." }); a:say({ text = "Third test message." }); return a.phase
+wait_until 15000 (corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser or {}).text == "First test message from the adviser."
+lua local s = corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser; return s.text .. " | more " .. s.more .. " | face " .. tostring(s.face)
+expect corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser.more == 2
+expect lfs.attributes(corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser.face or "", "size") ~= nil
+wait 500
+screenshot 1_adviser
+# Tap: the next message.
+native_tap Adviser
+wait_until 3000 (corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser or {}).text == "Second test message."
+# Dismiss All: he goes, and what he didn't get to say is in his history.
+lua require("sdl").native.post("adviser_dismiss", "{}")
+wait_until 5000 corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser == nil
+expect #TheApp.ui.adviser.queued_messages == 0
+lua local found = false; for _, m in ipairs(TheApp.ui.adviser.message_history) do if tostring(m) == "Third test message." then found = true end end; return found
+expect (function() for _, m in ipairs(TheApp.ui.adviser.message_history) do if tostring(m) == "Third test message." then return true end end end)()
+screenshot 2_dismissed
