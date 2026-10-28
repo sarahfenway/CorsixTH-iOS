@@ -1,0 +1,27 @@
+# Start level 1, then use real taps to close the intro and open/close the
+# build and hire windows. Coordinates are game pixels.
+controls direct
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1500
+screenshot 1_intro
+expect TheApp.ui:getWindow(UIInformation) ~= nil
+# Close button of the intro message.
+tap 495 317
+wait 500
+expect TheApp.ui:getWindow(UIInformation) == nil
+# Bottom panel: Build Room.
+tap 258 456
+wait_until 3000 TheApp.ui:getWindow(UIBuildRoom) ~= nil
+wait 300
+screenshot 2_build_room
+lua TheApp.ui:getWindow(UIBuildRoom):close()
+# Bottom panel: Hire Staff.
+tap 370 456
+wait_until 3000 TheApp.ui:getWindow(UIHireStaff) ~= nil
+wait 300
+screenshot 3_hire_staff
+lua TheApp.ui:getWindow(UIHireStaff):close()
+wait 300
+screenshot 4_closed

@@ -1,0 +1,9 @@
+# After 05_background.txt: a fresh launch carries on from Resume.sav.
+wait_until 30000 TheApp.world ~= nil
+expect TheApp.world.hospitals[1].balance == 43210
+wait 1000
+screenshot resumed
+# Leaving to the main menu means the player is done: no resume next time.
+lua TheApp:loadMainMenu()
+wait 500
+expect lfs.attributes(TheApp.savegame_dir .. "Resume.sav", "size") == nil

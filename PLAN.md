@@ -198,7 +198,7 @@ back: bridge actions that call existing Lua functions. Suggested order:
 
 - Small, reviewable steps. After each phase, write a short note for Sarah: what changed, what was
   verified in the simulator, and what she needs to check on her phone or iPad.
-- Keep the patch workflow intact (see `CLAUDE.md`) so `build-ios.sh` on a clean checkout
-  reproduces the app.
+- `build-ios.sh` on a clean checkout must reproduce the app. Our code stays out of `CorsixTH/`
+  (see `CLAUDE.md`): new code in `src/`, only unavoidable hooks in `patches/corsixth-ios.patch`.
 - Desktop CorsixTH behaviour must not change. Gate everything on touch mode.
 - Never commit or redistribute Theme Hospital's data files.

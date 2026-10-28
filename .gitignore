@@ -8,3 +8,4 @@ tools/cmake-*/
 *.pkg
 .DS_Store
 .team-id
+CorsixTH/

@@ -25,7 +25,12 @@ bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
 
 The script checks Xcode, downloads CMake if you don't have it, and fetches pinned versions of
 CorsixTH 0.70.1, SDL2, SDL2_mixer, Lua 5.4, LPeg, LuaFileSystem, FreeType and libpng. It applies
-the iOS patch and pulls the game data out of the installer (about 90 MB).
+the iOS patch to CorsixTH and pulls the game data out of the installer (about 90 MB).
+
+CorsixTH isn't part of this repository. The script clones it into a `CorsixTH/` folder here; if
+you'd rather get it yourself, download the
+[CorsixTH 0.70.1 source](https://github.com/CorsixTH/CorsixTH/releases/tag/v0.70.1) and unzip it
+so that `CorsixTH/CorsixTH/CorsixTH.lua` exists before running the script.
 
 On the first run it lists the development teams on your Mac and asks which one should sign the
 app. Pick your own (the one marked **Personal Team** if you're on a free Apple ID), not a work
@@ -125,24 +130,28 @@ settings. Sound effects and the announcer work as normal.
 - **CMake errors:** the whole log is in `build-ios.cmake.log`.
 - **The game can't find its data:** check that `ThemeHospital/` in this folder has `DATA`, `LEVELS`
   and `QDATA` folders, then rebuild.
-- **Start again from scratch:** delete `build-ios/` (and `deps/` to re-download the sources).
+- **Start again from scratch:** delete `build-ios/` (and `deps/` and `CorsixTH/` to re-download the sources).
 
-## What the patch changes
+## How the port is put together
 
-`patches/corsixth-ios.patch` is applied to CorsixTH 0.70.1:
+This project's own code is in `src/` and is compiled into the app alongside CorsixTH:
 
-- `Src/touch_gestures.*` (new): turns touches into mouse actions, in trackpad or direct mode.
-  It has unit tests in `tests/test_touch_gestures.cpp`.
-- `Src/touch_ui.*` (new): iOS start-up. It keeps config in Documents, finds the bundled data,
-  picks a resolution that fits the screen (at least 640x480 game pixels, scaled up with sharp
-  pixels) and sets the SDL hints.
+- `touch_gestures.*`: turns touches into mouse actions, in trackpad or direct mode. It has unit
+  tests in `tests/test_touch_gestures.cpp`.
+- `touch_ui.*`: iOS start-up. It keeps config in Documents, finds the bundled data, picks a
+  resolution that fits the screen (at least 640x480 game pixels, scaled up with sharp pixels) and
+  sets the SDL hints.
+- `touch_storage.*`, `ios_platform.*`: iCloud Drive saves, moving older saves across, and the
+  console log file. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
+- `touch_automation.*`: scripted test runs in the simulator (`build-ios.sh --run tests/automation`).
+
+`patches/corsixth-ios.patch` makes the small changes needed in CorsixTH's own files:
+
 - `sdl_core.cpp`: routes touch events through the above, and stops drawing while the app is in
   the background.
 - `th_gfx_sdl.cpp`: creates a full-screen, high-DPI window on iOS.
 - `sdl_wm.cpp`, `window.lua`, `ui.lua`: the on-screen keyboard for text boxes.
-- `game_ui.lua`: lets you pinch-zoom while panning.
-- `Src/touch_storage.*`, `Src/ios_platform.*` (new): iCloud Drive saves, moving older saves
-  across, and the console log file. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
+- `game_ui.lua`: pinch zoom on touch screens, also while panning.
 - `app.lua`: saving when the app goes into the background, and resuming on launch.
 - `app.lua`, `config_finder.lua`: iOS settings (resolution, bundled data, touch controls, no
   edge scrolling, music off without music files).

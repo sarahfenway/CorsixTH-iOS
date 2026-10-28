@@ -1,0 +1,32 @@
+# Save from the save window (tapping its text box and typing a name), then
+# load the save back.
+controls direct
+wait_until 30000 TheApp.ui ~= nil
+lua os.remove(TheApp.savegame_dir .. "AutoTest.sav")
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua TheApp.ui:addWindow(UISaveGame(TheApp.ui))
+wait 500
+screenshot 1_save_window
+expect not require("sdl").wm.isScreenKeyboardShown()
+# The "new save game" text box.
+tap 349 343
+wait 500
+expect require("sdl").wm.isScreenKeyboardShown()
+screenshot 2_keyboard
+type AutoTest
+key Return
+wait_until 5000 lfs.attributes(TheApp.savegame_dir .. "AutoTest.sav", "size") ~= nil
+expect TheApp.ui:getWindow(UISaveGame) == nil
+expect not require("sdl").wm.isScreenKeyboardShown()
+lua lfs.attributes(TheApp.savegame_dir .. "AutoTest.sav", "size")
+# Change something, then load and check it's back.
+lua TheApp.world.hospitals[1].balance = 12345
+lua TheApp:load(TheApp.savegame_dir .. "AutoTest.sav")
+wait_until 10000 TheApp.world ~= nil and TheApp.world.hospitals[1].balance ~= 12345
+lua TheApp.world.hospitals[1].balance
+lua TheApp.ui:addWindow(UILoadGame(TheApp.ui, "game"))
+wait 500
+screenshot 3_load_window

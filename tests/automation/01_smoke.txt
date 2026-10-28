@@ -1,0 +1,7 @@
+# The app starts and reaches the main menu.
+wait_until 30000 TheApp.ui ~= nil
+wait 1500
+lua TheApp.config.width .. "x" .. TheApp.config.height
+lua TheApp.savegame_dir
+lua tostring(TheApp.world)
+screenshot main_menu

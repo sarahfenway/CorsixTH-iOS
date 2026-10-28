@@ -1,0 +1,12 @@
+# Going into the background saves Resume.sav. 06_resume.txt must run next.
+wait_until 30000 TheApp.ui ~= nil
+lua os.remove(TheApp.savegame_dir .. "Resume.sav")
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua TheApp.world.hospitals[1].balance = 43210
+host background
+wait 1000
+expect lfs.attributes(TheApp.savegame_dir .. "Resume.sav", "size") ~= nil
+screenshot back_in_foreground

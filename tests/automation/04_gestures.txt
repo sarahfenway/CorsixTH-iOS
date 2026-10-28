@@ -1,0 +1,31 @@
+# Two-finger pan moves the map, pinch zooms, trackpad drags move the cursor.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua rawset(_G, "auto_x", TheApp.ui.screen_offset_x); return auto_x
+pan -150 0
+wait 500
+lua TheApp.ui.screen_offset_x
+expect math.abs(TheApp.ui.screen_offset_x - rawget(_G, "auto_x")) > 75
+screenshot 1_panned
+expect TheApp.ui.zoom_factor == 1
+pinch 349 240 3
+wait 1500
+lua TheApp.ui.zoom_factor
+expect TheApp.ui.zoom_factor > 1.1
+screenshot 2_zoomed_in
+lua rawset(_G, "auto_zoom", TheApp.ui.zoom_factor); return auto_zoom
+pinch 349 240 0.25
+wait 1500
+lua TheApp.ui.zoom_factor
+expect TheApp.ui.zoom_factor < rawget(_G, "auto_zoom") - 0.5
+screenshot 3_zoomed_out
+# Trackpad mode: the cursor moves by the finger's movement.
+controls trackpad
+lua rawset(_G, "auto_cx", TheApp.ui.cursor_x); return auto_cx
+drag 200 200 300 220 300
+wait 300
+lua TheApp.ui.cursor_x
+expect TheApp.ui.cursor_x > rawget(_G, "auto_cx") + 50

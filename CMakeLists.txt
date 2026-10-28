@@ -20,7 +20,12 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_XCODE_GENERATE_SCHEME OFF)
 
 set(DEPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps)
-set(CTH_DIR ${DEPS_DIR}/CorsixTH/CorsixTH)
+# CorsixTH's own source (v0.70.1 with patches/corsixth-ios.patch applied),
+# downloaded by build-ios.sh. It isn't part of this repository.
+set(CTH_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/CorsixTH)
+set(CTH_DIR ${CTH_ROOT}/CorsixTH)
+# This project's own code: touch controls, iOS platform glue, test automation.
+set(PORT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(GAME_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ThemeHospital CACHE PATH
     "Theme Hospital data folder (DATA, LEVELS, QDATA, SOUND...) to bundle")
 set(MUSIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Music CACHE PATH
@@ -37,6 +42,10 @@ else()
 endif()
 
 if(NOT EXISTS ${CTH_DIR}/CorsixTH.lua)
+  message(FATAL_ERROR "CorsixTH/ is missing - run ./build-ios.sh (it downloads "
+    "CorsixTH 0.70.1 there and applies patches/corsixth-ios.patch)")
+endif()
+if(NOT EXISTS ${DEPS_DIR}/SDL/CMakeLists.txt)
   message(FATAL_ERROR "deps/ is missing - run ./build-ios.sh (it downloads the sources)")
 endif()
 
@@ -163,16 +172,18 @@ set(CTH_SOURCES
   th_lua_gfx.cpp th_lua_iso.cpp th_lua_lfs_ext.cpp th_lua_map.cpp
   th_lua_midi.cpp th_lua_movie.cpp th_lua_sound.cpp th_lua_strings.cpp
   th_lua_ui.cpp th_map.cpp th_map_overlays.cpp th_movie.cpp th_pathfind.cpp
-  th_sound.cpp th_strings.cpp touch_gestures.cpp touch_storage.cpp touch_ui.cpp
-  xmi2mid.cpp main.cpp)
+  th_sound.cpp th_strings.cpp xmi2mid.cpp main.cpp)
 list(TRANSFORM CTH_SOURCES PREPEND ${CTH_DIR}/Src/)
 list(APPEND CTH_SOURCES
-  ${DEPS_DIR}/CorsixTH/libs/rnc/rnc.cpp
-  ${DEPS_DIR}/CorsixTH/libs/whereami/whereami.c)
+  ${PORT_DIR}/touch_automation.cpp ${PORT_DIR}/touch_gestures.cpp
+  ${PORT_DIR}/touch_storage.cpp ${PORT_DIR}/touch_ui.cpp)
+list(APPEND CTH_SOURCES
+  ${CTH_ROOT}/libs/rnc/rnc.cpp
+  ${CTH_ROOT}/libs/whereami/whereami.c)
 if(CTH_IOS)
   # iCloud Drive access, written in Objective-C++.
-  list(APPEND CTH_SOURCES ${CTH_DIR}/Src/ios_platform.mm)
-  set_source_files_properties(${CTH_DIR}/Src/ios_platform.mm PROPERTIES
+  list(APPEND CTH_SOURCES ${PORT_DIR}/ios_platform.mm)
+  set_source_files_properties(${PORT_DIR}/ios_platform.mm PROPERTIES
     COMPILE_OPTIONS "-fobjc-arc")
 endif()
 
@@ -180,8 +191,8 @@ endif()
 # point, as upstream does (both have a file called main.cpp).
 add_library(cth_core STATIC ${CTH_SOURCES})
 target_include_directories(cth_core PUBLIC
-  ${CMAKE_BINARY_DIR}/cth ${CTH_DIR}/Src ${DEPS_DIR}/CorsixTH/libs
-  ${DEPS_DIR}/CorsixTH/libs/rnc ${DEPS_DIR}/CorsixTH/libs/whereami)
+  ${CMAKE_BINARY_DIR}/cth ${PORT_DIR} ${CTH_DIR}/Src ${CTH_ROOT}/libs
+  ${CTH_ROOT}/libs/rnc ${CTH_ROOT}/libs/whereami)
 target_link_libraries(cth_core PUBLIC
   SDL2::SDL2-static SDL2_mixer::SDL2_mixer-static freetype
   cth_lpeg cth_lfs cth_lua cth_png z)
