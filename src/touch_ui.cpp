@@ -412,6 +412,10 @@ void poll() {
   flush_actions();
 }
 
+void set_cursor_speed(double speed) {
+  trackpad.set_speed(std::clamp(speed, 0.25, 4.0));
+}
+
 void set_controls(const char* name) {
   bool want_trackpad = name == nullptr || std::strcmp(name, "direct") != 0;
   if (want_trackpad != trackpad_mode) {

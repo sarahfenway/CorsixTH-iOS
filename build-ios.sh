@@ -146,6 +146,12 @@ fi
 PATCH="$ROOT/patches/corsixth-ios.patch"
 if git apply --directory=CorsixTH --reverse --check "$PATCH" >/dev/null 2>&1; then
   note "iOS patch already applied to CorsixTH"
+elif [ -d "$CTH/.git" ] && ! git apply --directory=CorsixTH --check "$PATCH" >/dev/null 2>&1 \
+    && [ -n "$(git -C "$CTH" status --porcelain)" ]; then
+  # Someone is working on CorsixTH/ and has changed it since the patch was
+  # made; leave their changes alone.
+  note "CorsixTH/ has changes that aren't in the patch yet; using it as it is."
+  note "(Update the patch with: git -C CorsixTH diff > patches/corsixth-ios.patch)"
 else
   git apply --directory=CorsixTH "$PATCH" \
     || die "Couldn't apply patches/corsixth-ios.patch to CorsixTH/. It needs an
@@ -263,7 +269,7 @@ say "Generating the Xcode project"
 "$CMAKE" -S "$ROOT" -B "$BUILD_DIR" -G Xcode \
   -DCMAKE_SYSTEM_NAME=iOS \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
   -DCTH_BUNDLE_ID="$BUNDLE_ID" \
   -DCTH_DEVELOPMENT_TEAM="$TEAM" \
@@ -334,8 +340,6 @@ print(found)' "$1"
     rm -rf "$app_out" "$results"
     mkdir -p "$app_out" "$results"
     xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
-    console_start=0
-    [ -f "$CONSOLE" ] && console_start="$(wc -l < "$CONSOLE")"
     SIMCTL_CHILD_CORSIXTH_AUTOMATION="$script" \
     SIMCTL_CHILD_CORSIXTH_AUTOMATION_OUT="$app_out" \
     SIMCTL_CHILD_CORSIXTH_AUTOMATION_HOST=1 \
@@ -365,7 +369,8 @@ print(found)' "$1"
     done
     cp "$app_out"/*.png "$results/" 2>/dev/null || true
     cp "$app_out/automation.log" "$results/"
-    [ -f "$CONSOLE" ] && tail -n +"$((console_start + 1))" "$CONSOLE" > "$results/console.txt"
+    # The app starts console.txt afresh on every launch.
+    [ -f "$CONSOLE" ] && cp "$CONSOLE" "$results/console.txt"
     sed -n 's/.*RESULT: //p' "$results/automation.log" | tail -1
   }
 

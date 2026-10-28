@@ -1,32 +1,60 @@
-# Save from the save window (tapping its text box and typing a name), then
-# load the save back.
-controls direct
+# The native game menu pauses the game; save and load through it.
 wait_until 30000 TheApp.ui ~= nil
 lua os.remove(TheApp.savegame_dir .. "AutoTest.sav")
 lua TheApp:loadLevel(1, "easy")
 wait_until 30000 TheApp.world ~= nil
 wait 1000
 lua TheApp.ui:getWindow(UIInformation):close()
-lua TheApp.ui:addWindow(UISaveGame(TheApp.ui))
-wait 500
-screenshot 1_save_window
-expect not require("sdl").wm.isScreenKeyboardShown()
-# The "new save game" text box.
-tap 349 343
-wait 500
-expect require("sdl").wm.isScreenKeyboardShown()
-screenshot 2_keyboard
-type AutoTest
-key Return
+expect TheApp.world:getCurrentSpeed() ~= "Pause"
+native_tap Menu
+wait_until 3000 require("sdl").native.screen() == "game_menu"
+wait 1000
+expect TheApp.world:getCurrentSpeed() == "Pause"
+screenshot 1_game_menu
+# SwiftUI rows can't be tapped by scripts (no accessibility tree without
+# VoiceOver): show the screens directly and send what their buttons send.
+lua TheApp.native:show("save")
+wait 1000
+screenshot 2_save
+lua require("sdl").native.post("save", '{"name":"AutoTest"}')
 wait_until 5000 lfs.attributes(TheApp.savegame_dir .. "AutoTest.sav", "size") ~= nil
-expect TheApp.ui:getWindow(UISaveGame) == nil
-expect not require("sdl").wm.isScreenKeyboardShown()
-lua lfs.attributes(TheApp.savegame_dir .. "AutoTest.sav", "size")
-# Change something, then load and check it's back.
+wait 1000
+expect require("sdl").native.screen() == nil
+expect TheApp.world:getCurrentSpeed() ~= "Pause"
+# Change something, then load the save from the menu and check it's back.
 lua TheApp.world.hospitals[1].balance = 12345
-lua TheApp:load(TheApp.savegame_dir .. "AutoTest.sav")
+lua TheApp.native:show("load")
+wait 1000
+screenshot 3_load
+lua require("sdl").native.post("load", '{"path":"' .. TheApp.savegame_dir .. 'AutoTest.sav"}')
 wait_until 10000 TheApp.world ~= nil and TheApp.world.hospitals[1].balance ~= 12345
+wait 1000
+expect require("sdl").native.screen() == nil
 lua TheApp.world.hospitals[1].balance
-lua TheApp.ui:addWindow(UILoadGame(TheApp.ui, "game"))
+# Settings: switching touch controls is applied and saved.
+lua TheApp.native:show("settings")
+wait 1000
+screenshot 4_settings
+lua require("sdl").native.post("setting", '{"key":"touch_controls","value":"direct"}')
+wait 300
+expect TheApp.config.touch_controls == "direct"
+lua require("sdl").native.post("setting", '{"key":"touch_controls","value":"trackpad"}')
+wait 300
+expect TheApp.config.touch_controls == "trackpad"
+# What Done does.
+lua require("sdl").native.dismiss(); require("sdl").native.post("dismissed")
+wait 1000
+expect require("sdl").native.screen() == nil
+expect TheApp.world:getCurrentSpeed() ~= "Pause"
+# Text boxes that are still Theme Hospital's get a native text field.
+lua TheApp.native:editTextbox({text = "Hello", panel = {tooltip = {text = "Name"}}, abort = function() end, setText = function(_, t) rawset(_G, "auto_text", t) end, confirm = function() end})
+wait 1000
+screenshot 5_text_input
+lua require("sdl").native.post("text_input", '{"id":' .. (TheApp.native.next_text_id - 1) .. ',"text":"Hi there"}'); require("sdl").native.dismiss()
 wait 500
-screenshot 3_load_window
+expect rawget(_G, "auto_text") == "Hi there"
+# Quit to the main menu.
+lua require("sdl").native.post("quit_to_menu")
+wait_until 5000 require("sdl").native.screen() == "main_menu"
+wait 1000
+screenshot 6_back_to_main_menu

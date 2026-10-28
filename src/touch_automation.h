@@ -50,6 +50,8 @@ struct lua_State;
       type <text>                       text, as if typed on the keyboard
       key <name>                        press and release a key, by SDL name
                                         (e.g. Return, Escape, Backspace)
+      native_tap <label>                activate a native (UIKit/SwiftUI)
+                                        control by its accessibility label
       screenshot <name>
       host <request>                    ask the host script to do something
                                         (e.g. "background") and wait for it

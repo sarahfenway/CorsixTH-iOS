@@ -66,6 +66,9 @@ bool handle_event(const SDL_Event& e);
 //! cursor like a laptop trackpad) or "direct" (click where you touch).
 void set_controls(const char* name);
 
+//! Sets the trackpad cursor speed multiplier (1 = the finger's distance).
+void set_cursor_speed(double speed);
+
 //! Drives time based gestures. Call on every timer tick of the main loop.
 void poll();
 

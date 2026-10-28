@@ -37,6 +37,11 @@ option(CTH_ICLOUD "Keep save games in iCloud Drive (needs a paid developer accou
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(CTH_IOS ON)
   enable_language(OBJCXX)
+  enable_language(Swift)
+  # CMake records the Swift library folders of the SDK it configured with (the
+  # device SDK), which breaks simulator links; Xcode's own paths (below) follow
+  # whichever SDK is being built for.
+  set(CMAKE_Swift_IMPLICIT_LINK_DIRECTORIES "")
 else()
   set(CTH_IOS OFF)
 endif()
@@ -175,6 +180,7 @@ set(CTH_SOURCES
   th_sound.cpp th_strings.cpp xmi2mid.cpp main.cpp)
 list(TRANSFORM CTH_SOURCES PREPEND ${CTH_DIR}/Src/)
 list(APPEND CTH_SOURCES
+  ${PORT_DIR}/native_bridge.cpp
   ${PORT_DIR}/touch_automation.cpp ${PORT_DIR}/touch_gestures.cpp
   ${PORT_DIR}/touch_storage.cpp ${PORT_DIR}/touch_ui.cpp)
 list(APPEND CTH_SOURCES
@@ -214,6 +220,8 @@ endif()
 set(copy_runtime_files
   COMMAND ${CMAKE_COMMAND} -E copy ${CTH_DIR}/CorsixTH.lua ${CTH_RUNTIME_DIR}/CorsixTH.lua
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CTH_DIR}/Lua ${CTH_RUNTIME_DIR}/Lua
+  # This project's own Lua (native menus), loaded as corsixth.require("ios.x").
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/lua ${CTH_RUNTIME_DIR}/Lua/ios
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CTH_DIR}/Bitmap ${CTH_RUNTIME_DIR}/Bitmap
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CTH_DIR}/Levels ${CTH_RUNTIME_DIR}/Levels
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CTH_DIR}/Campaigns ${CTH_RUNTIME_DIR}/Campaigns)
@@ -237,6 +245,9 @@ if(CTH_IOS)
   set(IOS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ios)
   # The asset catalog (app icon) is compiled by Xcode as a bundle resource.
   target_sources(CorsixTH PRIVATE ${IOS_DIR}/Assets.xcassets)
+  # Native menus and toolbar (SwiftUI/UIKit), called from src/native_bridge.cpp.
+  file(GLOB CTH_SWIFT_SOURCES ${PORT_DIR}/ios/*.swift)
+  target_sources(CorsixTH PRIVATE ${CTH_SWIFT_SOURCES})
   set_target_properties(CorsixTH PROPERTIES
     OUTPUT_NAME CorsixTH
     XCODE_GENERATE_SCHEME ON
@@ -252,6 +263,10 @@ if(CTH_IOS)
     XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME AppIcon
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
     XCODE_ATTRIBUTE_ENABLE_BITCODE NO
+    XCODE_ATTRIBUTE_SWIFT_VERSION 5.0
+    XCODE_ATTRIBUTE_LIBRARY_SEARCH_PATHS
+      "$(inherited) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)"
+    XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER ${PORT_DIR}/ios/CorsixTH-Bridging-Header.h
     XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT "dwarf"
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL[variant=Debug] "s"
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL[variant=Release] "s")

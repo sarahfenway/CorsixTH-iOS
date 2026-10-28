@@ -79,9 +79,12 @@ If you'd rather click wherever you touch, set `touch_controls = [[direct]]` in
 | Long press or two-finger tap | Right click |
 | Two-finger drag / pinch | Moves the map / zooms |
 
-The menu bar appears when the cursor reaches the very top of the screen. Text boxes (hospital
-names, save names) bring up the keyboard. On an iPad, a real trackpad or mouse works too,
-including right click.
+Menus are native iOS screens. In a game, the bar at the top right builds rooms, furnishes
+corridors, edits rooms and hires staff; its building button opens the hospital screens (staff,
+town map, research, casebook, graphs, bank...), the play button sets the game speed and the ••• button
+opens the game menu (save, load, settings, restart, quit), which pauses the game. Money, the date
+and reputation are at the top left, with an envelope when a message (fax) is waiting. Text entry
+uses the iOS keyboard. On an iPad, a real trackpad or mouse works too, including right click.
 
 ## Saves, settings and music
 
@@ -144,6 +147,9 @@ This project's own code is in `src/` and is compiled into the app alongside Cors
 - `touch_storage.*`, `ios_platform.*`: iCloud Drive saves, moving older saves across, and the
   console log file. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
 - `touch_automation.*`: scripted test runs in the simulator (`build-ios.sh --run tests/automation`).
+- `native_bridge.*` and `ios/*.swift` (SwiftUI/UIKit), with `lua/native_ui.lua`: the native main
+  menu, game menu, save/load, settings, text entry and the in-game toolbar, which replace
+  CorsixTH's PC-style menus, dialogs and bottom panel.
 
 `patches/corsixth-ios.patch` makes the small changes needed in CorsixTH's own files:
 
@@ -155,6 +161,8 @@ This project's own code is in `src/` and is compiled into the app alongside Cors
 - `app.lua`: saving when the app goes into the background, and resuming on launch.
 - `app.lua`, `config_finder.lua`: iOS settings (resolution, bundled data, touch controls, no
   edge scrolling, music off without music files).
+- `ui.lua`, `menu.lua`, `bottom_panel.lua`, `window.lua`, `game_ui.lua`: hooks that hand menus,
+  file dialogs, text boxes and the bottom panel to the native UI.
 
 `tools/sdl2_uiscene_edit.py` also patches SDL2, because apps built with current iOS SDKs must use
 Apple's scene-based life cycle (UIScene), which SDL2 predates. The approach comes from SDL3: SDL's

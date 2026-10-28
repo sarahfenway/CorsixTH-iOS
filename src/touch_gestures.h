@@ -146,6 +146,9 @@ class trackpad_recogniser {
   //! Forget all touches, releasing any button that is held.
   void cancel(std::vector<mouse_action>& out);
 
+  //! Cursor speed multiplier (1 = the finger's own distance).
+  void set_speed(double speed) { cfg.speed = speed; }
+
   int cursor_x() const;
   int cursor_y() const;
 

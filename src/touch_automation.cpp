@@ -368,6 +368,17 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
       SDL_PushEvent(&ev);
     }
     s.resume_at = now + settle_ms;
+  } else if (command == "native_tap") {
+    if (rest.empty()) return bad("native_tap <label>");
+    bool truthy = false;
+    std::string result;
+    if (!run_lua(L, "require('sdl').native.tap([==[" + rest + "]==])", &truthy,
+                 &result) ||
+        !truthy) {
+      finish(false, "no native control called \"" + rest + "\"");
+      return false;
+    }
+    s.resume_at = now + settle_ms;
   } else if (command == "coords") {
     if (rest != "game" && rest != "points") return bad("coords game|points");
     s.game_coords = rest == "game";

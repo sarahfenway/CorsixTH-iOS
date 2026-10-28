@@ -1,29 +1,35 @@
 diff --git a/CorsixTH/Lua/app.lua b/CorsixTH/Lua/app.lua
-index 79a80b4..383a172 100644
+index 79a80b4..fb91082 100644
 --- a/CorsixTH/Lua/app.lua
 +++ b/CorsixTH/Lua/app.lua
-@@ -61,7 +61,8 @@ function App:App()
+@@ -61,7 +61,9 @@ function App:App()
      music_over = self.onMusicOver,
      movie_over = self.onMovieOver,
      sound_over = self.onSoundOver,
 -    multigesture = self.onMultiGesture
 +    multigesture = self.onMultiGesture,
 +    app_background = self.onAppBackground,
++    native = self.onNativeAction,
    }
    self.strings = {}
    self.savegame_version = SAVEGAME_VERSION
-@@ -131,6 +132,10 @@ function App:init()
+@@ -131,6 +133,15 @@ function App:init()
        "For reference, the error loading the config file was: " .. conf_err)
    end
    self:fixConfig()
 +  self.touch_ui = os.getenv("CORSIXTH_TOUCH_UI") == "1"
 +  if self.touch_ui then
 +    self:applyTouchConfig()
++    -- iOS: native menus and toolbar (src/ios, lua/native_ui.lua); nil elsewhere.
++    self.native = corsixth.require("ios.native_ui").new(self)
++    if self.native then
++      self.native:applyConfig()
++    end
 +  end
    corsixth.require("filesystem")
    local good_install_folder, error_message, charset = self:checkInstallFolder()
    self.good_install_folder = good_install_folder
-@@ -284,6 +289,12 @@ function App:init()
+@@ -284,6 +295,12 @@ function App:init()
    corsixth.require("audio")
    self.audio = Audio(self)
    self:initMusicDir()
@@ -36,7 +42,7 @@ index 79a80b4..383a172 100644
    self.audio:init()
  
    -- Hack to early initialise the audio and reduce delay on Windows
-@@ -399,6 +410,14 @@ function App:init()
+@@ -399,6 +416,14 @@ function App:init()
              FileTreeNode(self.savegame_dir .. "Autosaves"):getMostRecentlyModifiedChildFile(".%.sav$").label
        end
      end
@@ -51,7 +57,7 @@ index 79a80b4..383a172 100644
      -- If a savegame was specified, load it
      if self.command_line.load then
        local status, err = pcall(self.load, self, self.savegame_dir .. self.command_line.load)
-@@ -406,6 +425,10 @@ function App:init()
+@@ -406,6 +431,10 @@ function App:init()
          err = _S.errors.load_prefix .. err
          print(err)
          self.ui:addWindow(UIInformation(self.ui, { err }))
@@ -62,7 +68,7 @@ index 79a80b4..383a172 100644
        end
      end
      -- There might also be a message from the earlier initialization process that should be shown.
-@@ -604,7 +627,7 @@ function App:initMusicDir()
+@@ -604,7 +633,7 @@ function App:initMusicDir()
    local conf_path = self.command_line["config-file"] or nil  -- Gets the path of the config file ('nil' if it's in CorsixTH's dir)
    conf_path = conf_path:match("^(.-)[^" .. pathsep .. "]*$") -- Removes the config file name from the above path
  
@@ -71,7 +77,7 @@ index 79a80b4..383a172 100644
      -- On macOS skip checking the game's directory, since it's difficult to obtain and/or open
      corsixth_path = nil
    end
-@@ -713,6 +736,10 @@ end
+@@ -713,6 +742,10 @@ end
  function App:loadMainMenu(message)
    if self.world then
      self:worldExited()
@@ -82,7 +88,7 @@ index 79a80b4..383a172 100644
    end
  
    -- Make sure there is no blue filter active.
-@@ -1152,7 +1179,8 @@ function App:fixConfig()
+@@ -1152,7 +1185,8 @@ function App:fixConfig()
      elseif key == "player_name" then
        value = value:match('^%s*(.*%S)') or "" -- Trim spaces
        if value:len() == 0 then -- If empty, use computer user's name,
@@ -92,7 +98,7 @@ index 79a80b4..383a172 100644
        end
        value = value:match('^%s*(.*%S)') or ""
        if value:len() == 0 then -- unless that is also empty
-@@ -1171,6 +1199,76 @@ function App:fixConfig()
+@@ -1171,6 +1205,76 @@ function App:fixConfig()
    end
  end
  
@@ -169,19 +175,35 @@ index 79a80b4..383a172 100644
  function App:saveConfig()
    local conf_path = self.command_line["config-file"] or "config.txt"
    require('config_finder').save_config(conf_path, self.config)
+@@ -1392,6 +1496,14 @@ function App:onSoundOver(...)
+   return self.audio:onSoundPlayed(...)
+ end
+ 
++--! An action from the native UI (iOS); see lua/native_ui.lua.
++function App:onNativeAction(action, payload)
++  if self.native then
++    self.native:onAction(action, payload)
++  end
++  return true
++end
++
+ function App:onMultiGesture(...)
+   return self.ui:onMultiGesture(...)
+ end
 diff --git a/CorsixTH/Lua/config_finder.lua b/CorsixTH/Lua/config_finder.lua
-index 2a0eb4d..c0662bd 100644
+index 2a0eb4d..4fdd54d 100644
 --- a/CorsixTH/Lua/config_finder.lua
 +++ b/CorsixTH/Lua/config_finder.lua
-@@ -138,6 +138,7 @@ local function new_config_defaults()
+@@ -138,6 +138,8 @@ local function new_config_defaults()
      prevent_edge_scrolling = false,
      capture_mouse = true,
      right_mouse_scrolling = false,
 +    touch_controls = [[trackpad]],
++    touch_cursor_speed = 1,
      adviser_disabled = false,
      scrolling_momentum = 0.8,
      twentyfour_hour_clock = true,
-@@ -399,6 +400,16 @@ param(config_values, 'capture_mouse') .. [=[
+@@ -399,6 +401,20 @@ param(config_values, 'capture_mouse') .. [=[
  --]=] .. '\n' ..
  param(config_values, 'right_mouse_scrolling') .. [=[
  
@@ -195,11 +217,53 @@ index 2a0eb4d..c0662bd 100644
 +--]=] .. '\n' ..
 +param(config_values, 'touch_controls') .. [=[
 +
++-- Trackpad cursor speed (1 = as far as the finger moves).
++--]=] .. '\n' ..
++param(config_values, 'touch_cursor_speed') .. [=[
++
  -------------------------------------------------------------------------------
  -- Adviser on/off: If you set this to true the adviser will no longer
  -- pop up.
+diff --git a/CorsixTH/Lua/dialogs/bottom_panel.lua b/CorsixTH/Lua/dialogs/bottom_panel.lua
+index fb7f2fa..c1a0ea4 100644
+--- a/CorsixTH/Lua/dialogs/bottom_panel.lua
++++ b/CorsixTH/Lua/dialogs/bottom_panel.lua
+@@ -246,6 +246,9 @@ function UIBottomPanel:quit()
+ end
+ 
+ function UIBottomPanel:draw(canvas, x, y)
++  if TheApp.native then
++    return -- Hidden on iOS: the native toolbar replaces it.
++  end
+   Window.draw(self, canvas, x, y)
+ 
+   -- Draw balance with temporary offset in unicode languages
+@@ -412,6 +415,9 @@ function UIBottomPanel:showAdditionalButtons(x, y)
+ end
+ 
+ function UIBottomPanel:hitTest(x, y, x_offset)
++  if TheApp.native then
++    return false -- Hidden on iOS: the native toolbar replaces it.
++  end
+   local s = TheApp.config.ui_scale
+   return x >= (x_offset and x_offset * s or 0) and y >= 0 and x < self.width * s and y < self.height * s
+ end
+diff --git a/CorsixTH/Lua/dialogs/menu.lua b/CorsixTH/Lua/dialogs/menu.lua
+index a571816..1b804c9 100644
+--- a/CorsixTH/Lua/dialogs/menu.lua
++++ b/CorsixTH/Lua/dialogs/menu.lua
+@@ -340,6 +340,9 @@ function UIMenuBar:onMouseMove(x, y, dx, dy)
+ end
+ 
+ function UIMenuBar:appear()
++  if TheApp.native then
++    return -- iOS has a native toolbar and menus instead.
++  end
+   self.disappear_counter = nil
+   self.visible = true
+   if not self.on_top then
 diff --git a/CorsixTH/Lua/game_ui.lua b/CorsixTH/Lua/game_ui.lua
-index ef575f9..75c0577 100644
+index ef575f9..fb5873f 100644
 --- a/CorsixTH/Lua/game_ui.lua
 +++ b/CorsixTH/Lua/game_ui.lua
 @@ -590,8 +590,11 @@ function GameUI:onMouseMove(x, y, dx, dy)
@@ -237,7 +301,17 @@ index ef575f9..75c0577 100644
      -- calculate magnitude of pinch
      local mag = math.abs(dDist)
      if mag > multigesture_pinch_sensitivity_factor then
-@@ -857,6 +872,14 @@ function GameUI:onTick()
+@@ -839,6 +854,9 @@ end
+ 
+ function GameUI:onTick()
+   local repaint = UI.onTick(self)
++  if self.app.native then
++    self.app.native:onTick()
++  end
+   if not self:_isMouseScrollButtonDown() then
+     if math.abs(self.current_momentum.x) < 0.2 and math.abs(self.current_momentum.y) < 0.2 then
+       -- Stop scrolling
+@@ -857,6 +875,14 @@ function GameUI:onTick()
      end
      self.multigesturemove.x = 0.0
      self.multigesturemove.y = 0.0
@@ -253,7 +327,7 @@ index ef575f9..75c0577 100644
    if self.tick_scroll_amount or self.tick_scroll_amount_mouse then
      -- The scroll amount per tick gradually increases as the duration of the
 diff --git a/CorsixTH/Lua/ui.lua b/CorsixTH/Lua/ui.lua
-index 8c6cc93..741ca08 100644
+index 8c6cc93..98c04f5 100644
 --- a/CorsixTH/Lua/ui.lua
 +++ b/CorsixTH/Lua/ui.lua
 @@ -568,6 +568,10 @@ end
@@ -267,11 +341,37 @@ index 8c6cc93..741ca08 100644
        table.remove(self.textboxes, num)
        break
      end
+@@ -1045,6 +1049,10 @@ function UI:addWindow(window)
+   if window.closed then
+     return
+   end
++  -- iOS shows native screens instead of some windows (lua/native_ui.lua).
++  if self.app.native and self.app.native:interceptWindow(self, window) then
++    return
++  end
+   if window.modal_class then
+     -- NB: while instead of if in case of another window being created during the close function
+     while self.modal_windows[window.modal_class] do
 diff --git a/CorsixTH/Lua/window.lua b/CorsixTH/Lua/window.lua
-index 304a15e..c79475e 100644
+index 304a15e..13cc2fe 100644
 --- a/CorsixTH/Lua/window.lua
 +++ b/CorsixTH/Lua/window.lua
-@@ -1031,6 +1031,13 @@ function Textbox:setActive(active)
+@@ -1013,6 +1013,14 @@ end
+ --!param active (boolean) whether to activate (true) or deactivate (false) the box
+ function Textbox:setActive(active)
+   local ui = self.panel.window.ui
++  if active and TheApp.native and type(self.text) ~= "table" then
++    -- iOS: type into a native text field instead.
++    if self.button.toggled then
++      self.button:toggle()
++    end
++    TheApp.native:editTextbox(self)
++    return
++  end
+   if active then
+     -- Unselect any other textbox
+     for _, textbox in ipairs(ui.textboxes) do
+@@ -1031,6 +1039,13 @@ function Textbox:setActive(active)
    end
  
    self.active = active
@@ -286,27 +386,29 @@ index 304a15e..c79475e 100644
    if self.button.toggled ~= active then
      self.button:toggle()
 diff --git a/CorsixTH/Src/sdl_core.cpp b/CorsixTH/Src/sdl_core.cpp
-index 13c349a..a1c65a8 100644
+index 13c349a..f154658 100644
 --- a/CorsixTH/Src/sdl_core.cpp
 +++ b/CorsixTH/Src/sdl_core.cpp
-@@ -36,6 +36,8 @@ SOFTWARE.
+@@ -36,6 +36,9 @@ SOFTWARE.
  #include "lua.hpp"
  #include "lua_sdl.h"
  #include "th_lua.h"
++#include "native_bridge.h"
 +#include "touch_automation.h"
 +#include "touch_ui.h"
  
  namespace {
  
-@@ -266,6 +268,7 @@ constexpr std::string_view dispatch_timer("timer");
+@@ -266,6 +269,8 @@ constexpr std::string_view dispatch_timer("timer");
  constexpr std::string_view dispatch_callback("callback");
  constexpr std::string_view dispatch_window_resize("window_resize");
  constexpr std::string_view dispatch_frame("frame");
 +constexpr std::string_view dispatch_app_background("app_background");
++constexpr std::string_view dispatch_native("native");
  
  void mainloop(lua_State* L) {
    SDL_TimerID timer =
-@@ -284,6 +287,8 @@ void mainloop(lua_State* L) {
+@@ -284,6 +289,8 @@ void mainloop(lua_State* L) {
  
    std::string_view last_dispatch;
    int wait_error = 0;
@@ -315,7 +417,7 @@ index 13c349a..a1c65a8 100644
  
    while ((wait_error = SDL_WaitEvent(&e)) != 0) {
      bool do_frame = false;
-@@ -354,6 +359,27 @@ void mainloop(lua_State* L) {
+@@ -354,6 +361,27 @@ void mainloop(lua_State* L) {
            lua_pushinteger(L, e.motion.yrel);
            nargs = 5;
            break;
@@ -343,7 +445,7 @@ index 13c349a..a1c65a8 100644
          case SDL_MULTIGESTURE:
            last_dispatch = dispatch_multigesture;
            push_app_dispatch(L, last_dispatch);
-@@ -408,6 +434,7 @@ void mainloop(lua_State* L) {
+@@ -408,6 +436,7 @@ void mainloop(lua_State* L) {
            nargs = 0;
            break;
          case SDL_USEREVENT_TICK:
@@ -351,7 +453,20 @@ index 13c349a..a1c65a8 100644
            do_timer = true;
            nargs = 0;
            break;
-@@ -447,8 +474,12 @@ void mainloop(lua_State* L) {
+@@ -424,6 +453,12 @@ void mainloop(lua_State* L) {
+           break;
+         default:
+           nargs = 0;
++          if (native_bridge::is_native_event(e)) {
++            // An action from the native (iOS) UI.
++            last_dispatch = dispatch_native;
++            push_app_dispatch(L, last_dispatch);
++            nargs = 1 + native_bridge::push_event_args(L, e);
++          }
+           break;
+       }
+       if (nargs != 0) {
+@@ -447,8 +482,12 @@ void mainloop(lua_State* L) {
        }
        do_frame = do_frame || (lua_toboolean(L, -1) != 0);
        lua_pop(L, 2);
@@ -365,6 +480,14 @@ index 13c349a..a1c65a8 100644
        last_dispatch = dispatch_frame;
        do {
          if (fps.track_fps) {
+@@ -485,6 +524,7 @@ int luaopen_sdl(lua_State* L) {
+   luaT_register(L, "sdl", sdllib);
+   load_extra(L, "audio", luaopen_sdl_audio);
+   load_extra(L, "wm", luaopen_sdl_wm);
++  load_extra(L, "native", native_bridge::luaopen);
+ 
+   return 1;
+ }
 diff --git a/CorsixTH/Src/sdl_wm.cpp b/CorsixTH/Src/sdl_wm.cpp
 index 1433d85..ac13fe6 100644
 --- a/CorsixTH/Src/sdl_wm.cpp

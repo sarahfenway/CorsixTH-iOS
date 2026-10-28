@@ -91,6 +91,15 @@ screenshots, and every item above has been seen working.
 Replace the PC-style menus that sit around the game with native UIKit/SwiftUI screens shown over
 the game view.
 
+**Status (28 Oct 2026): done in the simulator; not yet tried on a device.** Bridge, main menu,
+game menu, save/load (rename, delete, overwrite), settings, native text entry. Beyond the plan, at
+Sarah's request: a Liquid Glass toolbar (build/furnish/edit/hire, hospital screens menu, speed menu,
+game menu) and a status pill (money, reputation, date, message envelope) replace the TH bottom panel
+and menu bar. Native strings are English only for now (CorsixTH's own strings are shouty menu
+labels); localise them later. The TH bottom panel's hover "dynamic info" bar is gone with it
+(Phase 2 hover work). SwiftUI rows can't be tapped by automation, so in-sheet navigation has only
+been checked by showing each screen directly.
+
 ### Bridge (build this first)
 
 - **Native side:** SwiftUI views hosted in `UIHostingController`, presented from SDL's root view
