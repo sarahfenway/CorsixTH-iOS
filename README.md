@@ -1,5 +1,7 @@
 # CorsixTH for iPhone and iPad
 
+[![Checks](https://github.com/sarahfenway/CorsixTH-iOS/actions/workflows/checks.yml/badge.svg)](https://github.com/sarahfenway/CorsixTH-iOS/actions/workflows/checks.yml)
+
 This builds **CorsixTH**, the open-source rebuild of the Theme Hospital engine, as an iOS app
 with a touch-first, native iOS interface: Liquid Glass toolbars, native menus and panels, and
 building, furnishing and hiring by touch. It plays Theme Hospital using the graphics, sounds and

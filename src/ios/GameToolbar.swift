@@ -210,6 +210,9 @@ final class GameToolbar {
       adviserCard.leadingAnchor.constraint(equalTo: guide.leadingAnchor, constant: 8),
       adviserCard.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
       adviserCard.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, multiplier: 0.6),
+      // Clear of the side panel (Build Room, Hire Staff: 360 points wide, 8 in
+      // from the edge; see NativeUI.present), so he can be read beside it.
+      adviserCard.trailingAnchor.constraint(lessThanOrEqualTo: guide.trailingAnchor, constant: -376),
       adviserRow.leadingAnchor.constraint(equalTo: adviserCard.contentView.leadingAnchor, constant: 10),
       adviserRow.trailingAnchor.constraint(equalTo: adviserCard.contentView.trailingAnchor, constant: -14),
       adviserRow.topAnchor.constraint(equalTo: adviserCard.contentView.topAnchor, constant: 10),
