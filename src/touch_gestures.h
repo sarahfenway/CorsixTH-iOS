@@ -150,7 +150,8 @@ class gesture_recogniser {
                                        more than pinch_threshold
 
     In pointer mode (placing things) nothing clicks with the left button: a
-    drag moves the pointer (and the item being placed) as above, a tap moves
+    drag moves the pointer (and the item being placed) exactly as far as the
+    finger moves (no acceleration), a tap moves
     it to the finger, and a long press right-clicks under the finger (picks a
     placed item up). Two fingers still pan and zoom.
 */

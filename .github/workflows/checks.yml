@@ -18,6 +18,11 @@ jobs:
           c++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/test_touch_gestures.cpp src/touch_gestures.cpp -o tg
           ./tg
 
+      - name: Screen layout unit tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/test_touch_layout.cpp src/touch_layout.cpp -o tl
+          ./tl
+
       - name: Save storage unit tests
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/test_touch_storage.cpp src/touch_storage.cpp -o ts

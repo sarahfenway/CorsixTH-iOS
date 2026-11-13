@@ -172,9 +172,6 @@ settings. Sound effects and the announcer work as normal.
 
 ## Known issues
 
-- **Folding or unfolding a foldable iPhone, and iPad Split View or Stage Manager:** the game picks
-  its resolution when it starts and doesn't adapt yet when the screen changes size. Quit and reopen
-  the app after folding or unfolding.
 - **Notch and Dynamic Island:** the native controls keep clear of them, but the game's own picture
   (and its few remaining windows) can be drawn underneath.
 - **Music:** none unless you add your own (see above). No intro or cut-scene movies either: they'd
@@ -211,9 +208,11 @@ still does every check and charge. Our code:
 
 - `src/touch_gestures.*`: turns touches into mouse actions (trackpad, direct, and the pointer mode
   used for placing). Pure C++ with unit tests in `tests/test_touch_gestures.cpp`.
-- `src/touch_ui.*`: iOS start-up (config in Documents, the bundled data, a resolution of at least
-  640×480 game pixels scaled up with sharp pixels, SDL hints) and the touch event glue, including
-  sending taps on the game's remaining windows to where the finger is.
+- `src/touch_ui.*`: iOS start-up (config in Documents, the bundled data, SDL hints) and the touch
+  event glue, including sending taps on the game's remaining windows to where the finger is.
+- `src/touch_layout.*`: the game's resolution for a screen (at least 640×480 game pixels, scaled up
+  with sharp pixels), picked at launch and again whenever the screen changes size: folding or
+  unfolding, iPad Split View and Stage Manager. Unit tests in `tests/test_touch_layout.cpp`.
 - `src/touch_storage.*`, `src/ios_platform.*`: iCloud Drive saves, moving older saves across, and
   the console log. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
 - `src/native_bridge.*`: the `SDL.native` Lua module. Lua sends JSON to the native screens; they
@@ -237,7 +236,8 @@ still does every check and charge. Our code:
 - `sdl_core.cpp`: routes touch events through the above, replaces SDL's own pinch detection (which
   read every wobble of a two-finger pan as a zoom), and stops drawing in the background.
 - `th_gfx_sdl.cpp`: a full-screen, high-DPI window on iOS.
-- `sdl_wm.cpp`, `window.lua`, `ui.lua`: the on-screen keyboard for text boxes.
+- `sdl_wm.cpp`, `window.lua`, `ui.lua`: the on-screen keyboard for text boxes, and following the
+  screen when it changes size.
 - `game_ui.lua`: pinch zoom around the fingers, also while panning; the tutorial telling the native
   interface what it points at.
 - `main.cpp`: runs the touch start-up before Lua.
@@ -278,6 +278,10 @@ c++ -std=c++17 -Isrc tests/test_touch_gestures.cpp src/touch_gestures.cpp -o /tm
 
 ```bash
 c++ -std=c++17 -Isrc tests/test_touch_storage.cpp src/touch_storage.cpp -o /tmp/ts && /tmp/ts
+```
+
+```bash
+c++ -std=c++17 -Isrc tests/test_touch_layout.cpp src/touch_layout.cpp -o /tmp/tl && /tmp/tl
 ```
 
 ## Licence

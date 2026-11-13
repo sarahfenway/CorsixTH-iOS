@@ -432,6 +432,22 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
       SDL_PushEvent(&ev);
     }
     s.resume_at = now + settle_ms;
+  } else if (command == "resize") {
+    // What SDL reports when the screen changes size (a foldable folding,
+    // iPad multitasking). Only the report: the window itself keeps its size,
+    // as a script can't fold the simulator, so the game is letterboxed in it.
+    int w = 0;
+    int h = 0;
+    if (std::sscanf(rest.c_str(), "%d %d", &w, &h) != 2) return bad("resize <w> <h>");
+    SDL_Window* window = game_window();
+    SDL_Event ev{};
+    ev.type = SDL_WINDOWEVENT;
+    ev.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+    ev.window.windowID = window != nullptr ? SDL_GetWindowID(window) : 0;
+    ev.window.data1 = w;
+    ev.window.data2 = h;
+    SDL_PushEvent(&ev);
+    s.resume_at = now + settle_ms;
   } else if (command == "native_tap") {
     if (rest.empty()) return bad("native_tap <label>");
     bool truthy = false;

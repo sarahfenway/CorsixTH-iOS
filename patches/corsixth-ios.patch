@@ -542,7 +542,7 @@ index ef575f9..87e9b10 100644
      _A.tutorial.doctor_in_invalid_position,            -- 5
    },
 diff --git a/CorsixTH/Lua/ui.lua b/CorsixTH/Lua/ui.lua
-index 8c6cc93..98c04f5 100644
+index 8c6cc93..19418a2 100644
 --- a/CorsixTH/Lua/ui.lua
 +++ b/CorsixTH/Lua/ui.lua
 @@ -568,6 +568,10 @@ end
@@ -556,7 +556,23 @@ index 8c6cc93..98c04f5 100644
        table.remove(self.textboxes, num)
        break
      end
-@@ -1045,6 +1049,10 @@ function UI:addWindow(window)
+@@ -990,6 +994,15 @@ end
+ --!param width (integer) New window width
+ --!param height (integer) New window height
+ function UI:onWindowResize(width, height)
++  if self.app.touch_ui then
++    -- The screen changed size (a foldable phone folded or unfolded, iPad
++    -- multitasking): the game's resolution follows, as chosen at launch.
++    local w, h = SDL.wm.touchResolution(width, height)
++    if w and (w ~= self.app.config.width or h ~= self.app.config.height) then
++      self:changeResolution(w, h)
++    end
++    return
++  end
+   if not self.app.config.fullscreen then
+     self:changeResolution(width, height)
+   end
+@@ -1045,6 +1058,10 @@ function UI:addWindow(window)
    if window.closed then
      return
    end
@@ -709,7 +725,7 @@ index 13c349a..5e77b72 100644
    return 1;
  }
 diff --git a/CorsixTH/Src/sdl_wm.cpp b/CorsixTH/Src/sdl_wm.cpp
-index 1433d85..ac13fe6 100644
+index 1433d85..64cab14 100644
 --- a/CorsixTH/Src/sdl_wm.cpp
 +++ b/CorsixTH/Src/sdl_wm.cpp
 @@ -28,8 +28,11 @@ SOFTWARE.
@@ -724,7 +740,7 @@ index 1433d85..ac13fe6 100644
  #include <array>
  
  namespace {
-@@ -62,9 +65,65 @@ int l_show_cursor(lua_State* L) {
+@@ -62,9 +65,81 @@ int l_show_cursor(lua_State* L) {
    return 0;
  }
  
@@ -782,12 +798,28 @@ index 1433d85..ac13fe6 100644
 +  return 0;
 +}
 +
-+constexpr std::array<struct luaL_Reg, 6> sdl_wmlib{
++// The game's resolution for a window of this size (touch devices only), or
++// nothing.
++int l_touch_resolution(lua_State* L) {
++  int width = 0;
++  int height = 0;
++  if (!touch_ui::resolution_for_window(static_cast<int>(luaL_checkinteger(L, 1)),
++                                       static_cast<int>(luaL_checkinteger(L, 2)),
++                                       &width, &height)) {
++    return 0;
++  }
++  lua_pushinteger(L, width);
++  lua_pushinteger(L, height);
++  return 2;
++}
++
++constexpr std::array<struct luaL_Reg, 7> sdl_wmlib{
      {{"setIconWin32", l_set_icon_win32},
       {"showCursor", l_show_cursor},
 +     {"setTextInputActive", l_set_text_input_active},
 +     {"isScreenKeyboardShown", l_is_screen_keyboard_shown},
 +     {"setTouchControls", l_set_touch_controls},
++     {"touchResolution", l_touch_resolution},
       {nullptr, nullptr}}};
  
  }  // namespace

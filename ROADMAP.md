@@ -4,10 +4,8 @@ What's planned, roughly in order. The README's "Known issues" says what doesn't 
 
 ## Next
 
-1. **Adapt to screen size changes.** Folding or unfolding a foldable iPhone, and iPad Split View
-   and Stage Manager, should re-pick the game's resolution instead of keeping the one chosen at
-   launch: recompute it on `SDL_WINDOWEVENT_SIZE_CHANGED` and call `UI:changeResolution`, as a
-   desktop window resize does.
+1. **Check folding and unfolding on a device.** The game follows the screen's new size (tested in
+   the simulator by reporting the size change, as the simulator can't be folded from a script).
 2. **Safe areas.** Keep the game's remaining windows clear of the notch, Dynamic Island and home
    indicator (the native controls already are), using the window's safe-area insets.
 

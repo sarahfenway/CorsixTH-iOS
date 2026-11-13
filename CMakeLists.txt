@@ -182,7 +182,7 @@ list(TRANSFORM CTH_SOURCES PREPEND ${CTH_DIR}/Src/)
 list(APPEND CTH_SOURCES
   ${PORT_DIR}/native_bridge.cpp
   ${PORT_DIR}/touch_automation.cpp ${PORT_DIR}/touch_gestures.cpp
-  ${PORT_DIR}/touch_storage.cpp ${PORT_DIR}/touch_ui.cpp)
+  ${PORT_DIR}/touch_layout.cpp ${PORT_DIR}/touch_storage.cpp ${PORT_DIR}/touch_ui.cpp)
 list(APPEND CTH_SOURCES
   ${CTH_ROOT}/libs/rnc/rnc.cpp
   ${CTH_ROOT}/libs/whereami/whereami.c)

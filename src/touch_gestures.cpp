@@ -524,11 +524,13 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
   }
   if (st == state::tracking || st == state::dragging) {
     // Gentle acceleration: slow movements are precise, flicks go further.
+    // Placing (pointer mode) is always 1:1, so the item lands where the
+    // finger's movement says.
     double dx = x - prev_x;
     double dy = y - prev_y;
     double dt = std::max<double>(1.0, now - last_move_time);
     double velocity = std::sqrt(dx * dx + dy * dy) / dt;  // pixels per ms
-    double gain = 1.0 + std::clamp((velocity - 0.25) * 0.8, 0.0, 1.5);
+    double gain = pointer_mode ? 1.0 : 1.0 + std::clamp((velocity - 0.25) * 0.8, 0.0, 1.5);
     last_move_time = now;
     move_cursor(dx * gain * cfg.speed, dy * gain * cfg.speed, out);
   }

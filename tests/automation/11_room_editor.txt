@@ -128,7 +128,7 @@ lua local w = TheApp.ui:getWindow(UIPlaceObjects); rawset(_G, "auto_before", {Th
 drag_at {100, 300, 180, 300}
 wait 500
 lua local w = TheApp.ui:getWindow(UIPlaceObjects); local b = rawget(_G, "auto_before"); return (TheApp.ui.cursor_x - b[1]) .. "," .. (TheApp.ui.cursor_y - b[2]) .. " cell " .. tostring(w.object_cell_x) .. "," .. tostring(w.object_cell_y)
-expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_before")[1] - 80) <= 30 and math.abs(TheApp.ui.cursor_y - rawget(_G, "auto_before")[2]) <= 10
+expect math.abs(TheApp.ui.cursor_x - rawget(_G, "auto_before")[1] - 80) <= 3 and math.abs(TheApp.ui.cursor_y - rawget(_G, "auto_before")[2]) <= 3
 expect #TheApp.ui:getWindow(UIPlaceObjects).objects == 1
 # Tap where it should go, then Place.
 tap_at (function() local s = rawget(_G, "auto_spot3"); local sx, sy = TheApp.ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {sx, sy} end)()

@@ -1,0 +1,48 @@
+# Folding and unfolding (and iPad multitasking): when the screen changes size
+# the game re-picks its resolution as at launch, and taps, the game's windows
+# and Quick Build follow. The harness can only report the new size (the
+# simulator can't be folded from a script), so the game is letterboxed in the
+# old window here; on a device the window really changes.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua rawset(_G, "auto_size", {TheApp.config.width, TheApp.config.height}); return TheApp.config.width .. "x" .. TheApp.config.height
+# Unfold: the Duo's inner screen, 951x669 points, gets one game pixel per point.
+resize 951 669
+wait_until 3000 TheApp.config.width == 951 and TheApp.config.height == 669
+lua local w, h = TheApp.ui.app.config.width, TheApp.ui.app.config.height; return w .. "x" .. h .. " zoom " .. TheApp.ui.zoom_factor
+wait 500
+screenshot 1_unfolded
+# Taps still land where they should: a fax's button, tapped where it is.
+lua TheApp.ui.bottom_panel:queueMessage("information", { { text = "Unfolded" }, choices = { { text = "OK", choice = "close" } } })
+wait_until 5000 #corsixth.require("ios.json").decode(TheApp.native.toolbar_json).faxes == 1
+native_tap Information
+wait_until 3000 TheApp.ui:getWindow(UIFax) ~= nil
+lua local f = TheApp.ui:getWindow(UIFax); return f.x .. "," .. f.y
+expect TheApp.ui:getWindow(UIFax).x + 640 <= 951
+lua local f = TheApp.ui:getWindow(UIFax); local b = f.choice_buttons[1]; rawset(_G, "auto_choice", {math.floor(f.x + b.x + 21), math.floor(f.y + b.y + 21)}); return auto_choice[1] .. "," .. auto_choice[2]
+tap_at rawget(_G, "auto_choice")
+wait_until 3000 TheApp.ui:getWindow(UIFax) == nil
+# Quick Build at the new size.
+lua TheApp.native:show("room_catalog")
+wait 800
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 800
+screenshot 2_quick_build
+native_tap Build
+wait_until 20000 TheApp.native.quick_build == nil
+lua local found; for _, room in pairs(TheApp.world.rooms) do if room.room_info.id == "gp" and room.built then found = room end end; rawset(_G, "auto_gp", found); return tostring(found ~= nil)
+expect rawget(_G, "auto_gp") ~= nil
+# Fold again: back to the outer screen's resolution.
+resize 678 466
+wait_until 3000 TheApp.config.width == rawget(_G, "auto_size")[1] and TheApp.config.height == rawget(_G, "auto_size")[2]
+wait 800
+screenshot 3_folded
+lua for i = #TheApp.ui.windows, 1, -1 do local w = TheApp.ui.windows[i]; if class.is(w, UIInformation) then w:close() end end
+native_tap Hire Staff
+wait_until 3000 require("sdl").native.screen() == "hire_staff"
+wait 800
+screenshot 4_hire_folded

@@ -56,6 +56,11 @@ void setup_storage();
 //! SDL window flags to use for the game window in touch mode.
 uint32_t window_flags();
 
+//! The screen changed size (a foldable phone folded or unfolded, iPad Split
+//! View or Stage Manager): the game's resolution for the window's new size in
+//! points, as chosen at launch. False when touch mode is off.
+bool resolution_for_window(int window_w, int window_h, int* width, int* height);
+
 //! Size to create the game window at in touch mode.
 void window_size(int* width, int* height);
 

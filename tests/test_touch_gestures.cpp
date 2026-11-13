@@ -427,7 +427,7 @@ int main() {
   }
 
   // Placing things (trackpad in pointer mode): a drag moves the item like
-  // the cursor, so the finger never hides it; a tap moves it to the finger;
+  // the cursor, but 1:1 however fast, so the finger never hides it; a tap moves it to the finger;
   // nothing is placed on lift (the native Place button does that); a long
   // press right-clicks under the finger (picks a placed item up).
   auto placing = [] {
@@ -454,7 +454,19 @@ int main() {
     g.finger_move(1, 120, 110, 1064, out);
     g.finger_up(1, 120, 110, 1300, out);
     expect("placing: a drag moves the pointer as the finger moves; lifting doesn't click", out,
-           "move(500,240) move(510,245) move(515,245) move(521,251) ");
+           "move(500,240) move(510,245) move(515,245) move(520,250) ");
+  }
+  {
+    // A fast drag (that the trackpad would speed up) still moves it 1:1.
+    auto g = placing();
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_move(1, 120, 100, 1010, out);
+    g.finger_move(1, 160, 100, 1020, out);
+    g.finger_move(1, 200, 100, 1030, out);
+    g.finger_up(1, 200, 100, 1040, out);
+    expect("placing: a fast drag moves the pointer exactly as far", out,
+           "move(500,240) move(520,240) move(560,240) move(600,240) ");
   }
   {
     auto g = placing();
@@ -467,7 +479,7 @@ int main() {
     g.finger_up(1, 110, 100, 1700, out);
     expect("placing: a long press right-clicks under the finger; a drag then moves on", out,
            "move(500,240) move(100,100) press3(100,100) release3(100,100) "
-           "move(105,100) move(111,100) ");
+           "move(105,100) move(110,100) ");
   }
   {
     auto g = placing();

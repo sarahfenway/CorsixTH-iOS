@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "touch_automation.h"
 #include "touch_gestures.h"
+#include "touch_layout.h"
 #include "touch_storage.h"
 
 #include <sys/stat.h>
@@ -297,20 +298,16 @@ void platform_init() {
     std::swap(screen_w, screen_h);
   }
 
-  // Theme Hospital's interface needs at least 640x480 game pixels. On small
-  // screens (phones) the logical resolution is stretched up to that; on big
-  // screens (iPads, folded-out phones) one game pixel is one point.
-  if (screen_w > 0 && screen_h > 0) {
-    const int min_w = 640;
-    const int min_h = env_int("CORSIXTH_TOUCH_MIN_HEIGHT", 480);
-    double scale = std::max({static_cast<double>(min_w) / screen_w,
-                             static_cast<double>(min_h) / screen_h, 1.0});
-    int logical_w = static_cast<int>(std::lround(screen_w * scale));
-    int logical_h = static_cast<int>(std::lround(screen_h * scale));
-    set_env("CORSIXTH_TOUCH_WIDTH", std::to_string(logical_w), true);
-    set_env("CORSIXTH_TOUCH_HEIGHT", std::to_string(logical_h), true);
+  // The game's resolution for this screen (touch_layout.h).
+  int width = 0;
+  int height = 0;
+  logical_size(screen_w, screen_h, 640, env_int("CORSIXTH_TOUCH_MIN_HEIGHT", 480), &width,
+               &height);
+  if (width > 0) {
+    set_env("CORSIXTH_TOUCH_WIDTH", std::to_string(width), true);
+    set_env("CORSIXTH_TOUCH_HEIGHT", std::to_string(height), true);
     std::printf("Touch UI: screen %dx%d, game resolution %dx%d\n", screen_w,
-                screen_h, logical_w, logical_h);
+                screen_h, width, height);
   }
 
   // Scripted test runs (CORSIXTH_AUTOMATION); see touch_automation.h.
@@ -370,6 +367,19 @@ uint32_t window_flags() {
            SDL_WINDOW_BORDERLESS;
   }
   return 0;
+}
+
+bool resolution_for_window(int window_w, int window_h, int* width, int* height) {
+  if (!enabled() || window_w <= 0 || window_h <= 0) {
+    return false;
+  }
+  screen_w = window_w;
+  screen_h = window_h;
+  logical_size(window_w, window_h, 640, env_int("CORSIXTH_TOUCH_MIN_HEIGHT", 480), width,
+               height);
+  std::printf("Touch UI: screen now %dx%d, game resolution %dx%d\n", window_w, window_h,
+              *width, *height);
+  return true;
 }
 
 void window_size(int* width, int* height) {
