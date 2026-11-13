@@ -313,6 +313,23 @@ for runtime, devices in sorted(json.load(sys.stdin)["devices"].items()):
             found = d["udid"]
 print(found)' "$1"
   }
+  # A screenshot of the simulator. A foldable has two screens and simctl won't
+  # pick one, so then take each and keep the one showing something (the
+  # folded-away screen is black, which compresses to the smallest file).
+  sim_screenshot() {
+    xcrun simctl io "$1" screenshot "$2" >/dev/null 2>&1 && return
+    best_size=0
+    for display in $(xcrun simctl io "$1" screenshot "$2" 2>&1 | sed -n 's/.*--display=\([^ ]*\).*/\1/p'); do
+      xcrun simctl io "$1" screenshot --display="$display" "$2.try.png" >/dev/null 2>&1 || continue
+      size=$(wc -c < "$2.try.png")
+      if [ "$size" -gt "$best_size" ]; then
+        best_size=$size
+        mv "$2.try.png" "$2"
+      fi
+    done
+    rm -f "$2.try.png"
+  }
+
   SIM_NAME="${SIM_DEVICE:-CorsixTH-Duo}"
   UDID="$(find_simulator "$SIM_NAME")"
   if [ -z "$UDID" ]; then
@@ -370,7 +387,7 @@ print(found)' "$1"
         request="$(cat "$app_out/request")"
         case "$request" in
           "screenshot "*)
-            xcrun simctl io "$UDID" screenshot "$results/${request#screenshot }.png" >/dev/null 2>&1 ;;
+            sim_screenshot "$UDID" "$results/${request#screenshot }.png" ;;
           background)
             # Another app comes to the front; ours is told it's going into
             # the background, gets a few seconds, then comes back.

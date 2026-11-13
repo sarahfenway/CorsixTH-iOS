@@ -563,11 +563,13 @@ struct RoomOption: Codable, Hashable, Identifiable {
   var affordable: Bool
   var quick: Bool
   var image: String?
+  var highlight: Bool?  // The tutorial points at it.
 }
 
 struct HireState: Codable, Hashable {
   var categories: [NamedOption]
   var candidates: [String: [Candidate]]
+  var suggested: String?  // The tab the tutorial asks for.
   var abacus: String?  // The ends of the game's skill bar.
   var computer: String?
 }

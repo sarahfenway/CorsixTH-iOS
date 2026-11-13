@@ -39,6 +39,7 @@ struct ToolbarState: Decodable {
   var speeds: [NamedOption] = []
   var windows: [NamedOption] = []
   var icons: [String: String] = [:]  // Game art for the tool buttons, by tool id.
+  var highlight: String?  // The tool button the tutorial points at.
 
   init() {}
 
@@ -54,11 +55,13 @@ struct ToolbarState: Decodable {
     speed = (try? c.decodeIfPresent(String.self, forKey: .speed)) ?? speed
     speeds = (try? c.decodeIfPresent([NamedOption].self, forKey: .speeds)) ?? speeds
     windows = (try? c.decodeIfPresent([NamedOption].self, forKey: .windows)) ?? windows
+    highlight = try? c.decodeIfPresent(String.self, forKey: .highlight)
     icons = (try? c.decodeIfPresent([String: String].self, forKey: .icons)) ?? icons
   }
 
   private enum CodingKeys: String, CodingKey {
     case money, date, reputation, faxes, faxesWaiting, adviser, speed, speeds, windows, icons
+    case highlight
   }
 }
 
@@ -279,6 +282,7 @@ final class GameToolbar {
 
     // The game's own button art where Lua has made it; symbols otherwise.
     for (tool, button) in toolButtons {
+      GameToolbar.setTutorialRing(on: button, tool == new.highlight)
       if let image = GameArt.image(new.icons[tool], height: 30) {
         button.setImage(image, for: .normal)
         button.imageView?.layer.cornerRadius = 5
@@ -310,6 +314,31 @@ final class GameToolbar {
   }
 
   // MARK: Helpers
+
+  //! A pulsing ring round the button the tutorial points at.
+  private static func setTutorialRing(on button: UIButton, _ on: Bool) {
+    let existing = button.layer.sublayers?.first { $0.name == "tutorial" }
+    if !on {
+      existing?.removeFromSuperlayer()
+      return
+    }
+    // (Before its first layout the button has no size; the next update adds it.)
+    guard existing == nil, button.bounds.width > 0 else { return }
+    let ring = CALayer()
+    ring.name = "tutorial"
+    ring.frame = button.bounds.insetBy(dx: -3, dy: -3)
+    ring.cornerRadius = 9
+    ring.borderWidth = 3
+    ring.borderColor = UIColor.systemYellow.cgColor
+    let pulse = CABasicAnimation(keyPath: "opacity")
+    pulse.fromValue = 1
+    pulse.toValue = 0.3
+    pulse.duration = 0.6
+    pulse.autoreverses = true
+    pulse.repeatCount = .infinity
+    ring.add(pulse, forKey: "pulse")
+    button.layer.addSublayer(ring)
+  }
 
   private static func glassView() -> UIVisualEffectView {
     let view: UIVisualEffectView

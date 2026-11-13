@@ -652,11 +652,31 @@ struct RoomCard: View {
       .background(
         RoundedRectangle(cornerRadius: 14, style: .continuous)
           .fill(Color(uiColor: .secondarySystemBackground)))
+      .overlay {
+        if room.highlight == true {
+          TutorialRing(cornerRadius: 14)
+        }
+      }
       .opacity(room.affordable ? 1 : 0.5)
     }
     .buttonStyle(.plain)
     .disabled(!room.affordable)
     .accessibilityLabel("\(room.name), \(room.cost)")
+  }
+}
+
+// A pulsing ring round what the tutorial wants the player to tap.
+struct TutorialRing: View {
+  var cornerRadius: CGFloat
+  @State private var bright = false
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+      .strokeBorder(Color.yellow, lineWidth: 3)
+      .opacity(bright ? 1 : 0.35)
+      .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: bright)
+      .onAppear { bright = true }
+      .allowsHitTesting(false)
   }
 }
 
@@ -762,6 +782,8 @@ struct HireStaffView: View {
         }
       }
     }
+    // The tutorial asks for a receptionist, then a doctor.
+    .task(id: hire?.suggested) { if let tab = hire?.suggested { category = tab } }
   }
 }
 

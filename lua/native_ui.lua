@@ -154,6 +154,7 @@ end
 
 function NativeUI:show(screen)
   local app = self.app
+  self.shown_screen = screen
   if app.world and not unpaused_screens[screen] then
     self:pauseGame()
   end
@@ -167,6 +168,35 @@ function NativeUI:refresh(message)
   local state = self:state()
   state.message = message
   SDL.native.update(json.encode(state))
+end
+
+-- The bottom panel's buttons, as the tutorial numbers them, and the toolbar's.
+local tutorial_tools = { [2] = "build", [3] = "furnish", [4] = "edit", [5] = "hire" }
+
+--! The tutorial wants a button to blink (game_ui.lua's tutorial_blink), or
+-- stops (nil). Bottom-panel buttons light up on the toolbar; the hire and
+-- build panels follow the tutorial themselves (hireState, roomList).
+function NativeUI:tutorialBlink(window, button)
+  local tool = window == "UIBottomPanel" and tutorial_tools[button] or nil
+  if tool ~= self.tutorial_tool then
+    self.tutorial_tool = tool
+    self:updateToolbar(true)
+  end
+  -- The tutorial moves on after the panel has opened: show it the new step.
+  local screen = SDL.native.screen()
+  if screen == "hire_staff" or screen == "room_catalog" then
+    self:refresh()
+  end
+end
+
+--! The tutorial's chapter and phase, if it's running.
+function NativeUI:tutorialAt(chapter, ...)
+  local t = self.app.ui and self.app.ui.tutorial
+  if not t or t.chapter ~= chapter then return false end
+  for _, phase in ipairs({ ... }) do
+    if t.phase == phase then return true end
+  end
+  return false
 end
 
 --! Shows a native alert.
@@ -647,7 +677,10 @@ function NativeUI:hireState()
     categories[#categories + 1] = { id = category.id, title = category.title }
     candidates[category.id] = list
   end
-  return { categories = categories, candidates = candidates,
+  -- The tutorial asks for a receptionist, then a doctor: open on that tab.
+  local suggested = self:tutorialAt(2, 2, 3, 4, 5) and "Receptionist" or
+      self:tutorialAt(4, 2, 3) and "Doctor" or nil
+  return { categories = categories, candidates = candidates, suggested = suggested,
     abacus = self:spritePicture("abacus"), computer = self:spritePicture("computer") }
 end
 
@@ -743,6 +776,8 @@ function NativeUI:roomList()
             affordable = world.free_build_mode or hospital.balance >= cost,
             quick = quick_build_rooms[room.id] or false,
             image = self:roomPicture(room),
+            -- The tutorial's GP's office.
+            highlight = room.id == "gp" and self:tutorialAt(3, 2, 3) or nil,
           }
           break
         end
@@ -823,6 +858,7 @@ function NativeUI:toolbarState()
   end
   return {
     icons = icons,
+    highlight = self.tutorial_tool,
     money = format_money(hospital.balance),
     date = _S.date_format.daymonth:format(date:dayOfMonth(), date:monthOfYear()),
     reputation = (hospital.reputation or 500) / 1000,
@@ -956,6 +992,15 @@ end
 -- The player closed the screen (Done, Resume or a swipe).
 function actions.dismissed(self)
   self:resumeGame()
+  -- Closed by the player: the tutorial steps back, as closing the game's
+  -- window does (UIHireStaff:close, UIBuildRoom:close).
+  local ui = self.app.ui
+  if ui and self.shown_screen == "hire_staff" then
+    ui:tutorialStep(2, { 2, 3, 4, 5 }, 1)
+    ui:tutorialStep(4, { 2, 3 }, 1)
+  elseif ui and self.shown_screen == "room_catalog" then
+    ui:tutorialStep(3, { 2, 3 }, 1)
+  end
 end
 
 local tools = {
@@ -1073,6 +1118,11 @@ function actions.pick_room(self, p)
     end
   end
   if not room then return end
+  if room.id == "gp" then
+    -- As choosing the diagnosis rooms, then the GP's office, in UIBuildRoom.
+    ui:tutorialStep(3, 2, 3)
+    ui:tutorialStep(3, 3, 4)
+  end
   SDL.native.dismiss()
   self:endQuickBuild()
   -- The same checks as UIBuildRoom:buildRoom.
@@ -1109,9 +1159,10 @@ function actions.hire(self, p)
     self:refresh("That person is no longer available.")
     return
   end
-  -- As UIHireStaff:hire.
-  ui:tutorialStep(2, { 3, 4, 5 }, 6)
-  ui:tutorialStep(4, 3, 4)
+  -- As UIHireStaff:hire. (The native panel has no tab or next/previous steps
+  -- for the tutorial to wait for, so it moves on from any of them.)
+  ui:tutorialStep(2, { 2, 3, 4, 5 }, 6)
+  ui:tutorialStep(4, { 2, 3 }, 4)
   if ui.hospital.balance < profile.wage then
     UIHireStaff.cannotAfford({ world = world })
     ui:playSound("wrong2.wav")

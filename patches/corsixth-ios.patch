@@ -289,7 +289,7 @@ index a571816..1b804c9 100644
    self.visible = true
    if not self.on_top then
 diff --git a/CorsixTH/Lua/game_ui.lua b/CorsixTH/Lua/game_ui.lua
-index ef575f9..885e5a8 100644
+index ef575f9..87e9b10 100644
 --- a/CorsixTH/Lua/game_ui.lua
 +++ b/CorsixTH/Lua/game_ui.lua
 @@ -590,8 +590,11 @@ function GameUI:onMouseMove(x, y, dx, dy)
@@ -382,6 +382,165 @@ index ef575f9..885e5a8 100644
    return repaint
  end
  
+@@ -1047,20 +1091,42 @@ function UI:togglePlayMusic()
+   self.app:saveConfig()
+ end
+ 
++-- Blinks a tutorial button. On iOS the native UI may stand in for the window
++-- (it isn't open then), and highlights its own control instead.
++local function tutorial_blink(window_class, name, button)
++  local window = TheApp.ui:getWindow(window_class)
++  if window then
++    window:startButtonBlinking(button)
++  end
++  if TheApp.native then
++    TheApp.native:tutorialBlink(name, button)
++  end
++end
++
++local function tutorial_stop_blink(window_class, name, button)
++  local window = TheApp.ui:getWindow(window_class)
++  if window then
++    window:stopButtonBlinking(button)
++  end
++  if TheApp.native then
++    TheApp.native:tutorialBlink(nil)
++  end
++end
++
+ local tutorial_phases
+ local function make_tutorial_phases()
+ tutorial_phases = {
+   {
+     -- 1) build reception
+     { text = _A.tutorial.build_reception,              -- 1
+-      begin_callback = function() TheApp.ui:getWindow(UIBottomPanel):startButtonBlinking(3) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBottomPanel):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBottomPanel, "UIBottomPanel", 3) end,
++      end_callback = function() tutorial_stop_blink(UIBottomPanel, "UIBottomPanel") end, },
+     { text = _A.tutorial.order_one_reception,          -- 2
+-      begin_callback = function() TheApp.ui:getWindow(UIFurnishCorridor):startButtonBlinking(3) end,
+-      end_callback = function() TheApp.ui:getWindow(UIFurnishCorridor):stopButtonBlinking(3) end, },
++      begin_callback = function() tutorial_blink(UIFurnishCorridor, "UIFurnishCorridor", 3) end,
++      end_callback = function() tutorial_stop_blink(UIFurnishCorridor, "UIFurnishCorridor", 3) end, },
+     { text = _A.tutorial.accept_purchase,              -- 3
+-      begin_callback = function() TheApp.ui:getWindow(UIFurnishCorridor):startButtonBlinking(2) end,
+-      end_callback = function() TheApp.ui:getWindow(UIFurnishCorridor):stopButtonBlinking(2) end, },
++      begin_callback = function() tutorial_blink(UIFurnishCorridor, "UIFurnishCorridor", 2) end,
++      end_callback = function() tutorial_stop_blink(UIFurnishCorridor, "UIFurnishCorridor", 2) end, },
+     _A.tutorial.rotate_and_place_reception,            -- 4
+     _A.tutorial.reception_invalid_position,            -- 5
+                                                        -- 6: object other than reception selected. currently no text for this phase.
+@@ -1069,20 +1135,20 @@ tutorial_phases = {
+   {
+     -- 2) hire receptionist
+     { text = _A.tutorial.hire_receptionist,            -- 1
+-      begin_callback = function() TheApp.ui:getWindow(UIBottomPanel):startButtonBlinking(5) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBottomPanel):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBottomPanel, "UIBottomPanel", 5) end,
++      end_callback = function() tutorial_stop_blink(UIBottomPanel, "UIBottomPanel") end, },
+     { text = _A.tutorial.select_receptionists,         -- 2
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(4) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 4) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     { text = _A.tutorial.next_receptionist,            -- 3
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(8) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 8) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     { text = _A.tutorial.prev_receptionist,            -- 4
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(5) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 5) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     { text = _A.tutorial.choose_receptionist,          -- 5
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(6) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 6) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     _A.tutorial.place_receptionist,                    -- 6
+     _A.tutorial.receptionist_invalid_position,         -- 7
+   },
+@@ -1091,14 +1157,14 @@ tutorial_phases = {
+     -- 3) build GP's office
+     -- 3.1) room window
+     { text = _A.tutorial.build_gps_office,             -- 1
+-      begin_callback = function() TheApp.ui:getWindow(UIBottomPanel):startButtonBlinking(2) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBottomPanel):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBottomPanel, "UIBottomPanel", 2) end,
++      end_callback = function() tutorial_stop_blink(UIBottomPanel, "UIBottomPanel") end, },
+     { text = _A.tutorial.select_diagnosis_rooms,       -- 2
+-      begin_callback = function() TheApp.ui:getWindow(UIBuildRoom):startButtonBlinking(1) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBuildRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBuildRoom, "UIBuildRoom", 1) end,
++      end_callback = function() tutorial_stop_blink(UIBuildRoom, "UIBuildRoom") end, },
+     { text = _A.tutorial.click_gps_office,             -- 3
+-      begin_callback = function() TheApp.ui:getWindow(UIBuildRoom):startButtonBlinking(5) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBuildRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBuildRoom, "UIBuildRoom", 5) end,
++      end_callback = function() tutorial_stop_blink(UIBuildRoom, "UIBuildRoom") end, },
+ 
+     -- 3.2) blueprint
+     -- [11][58] was maybe planned to be used in this place, but is not needed.
+@@ -1107,41 +1173,41 @@ tutorial_phases = {
+     _A.tutorial.room_too_small,                        -- 6
+     _A.tutorial.room_too_small_and_invalid,            -- 7
+     { text = _A.tutorial.room_big_enough,              -- 8
+-      begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
+-      end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIEditRoom, "UIEditRoom", 4) end,
++      end_callback = function() tutorial_stop_blink(UIEditRoom, "UIEditRoom") end, },
+ 
+     -- 3.3) door and windows
+     _A.tutorial.place_door,                            -- 9
+     _A.tutorial.door_in_invalid_position,              -- 10
+     { text = _A.tutorial.place_windows,                -- 11
+-      begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
+-      end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIEditRoom, "UIEditRoom", 4) end,
++      end_callback = function() tutorial_stop_blink(UIEditRoom, "UIEditRoom") end, },
+     { text = _A.tutorial.window_in_invalid_position,   -- 12
+-      begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
+-      end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIEditRoom, "UIEditRoom", 4) end,
++      end_callback = function() tutorial_stop_blink(UIEditRoom, "UIEditRoom") end, },
+ 
+     -- 3.4) objects
+     _A.tutorial.place_objects,                         -- 13
+     _A.tutorial.object_in_invalid_position,            -- 14
+     { text = _A.tutorial.confirm_room,                 -- 15
+-      begin_callback = function() TheApp.ui:getWindow(UIEditRoom):startButtonBlinking(4) end,
+-      end_callback = function() TheApp.ui:getWindow(UIEditRoom):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIEditRoom, "UIEditRoom", 4) end,
++      end_callback = function() tutorial_stop_blink(UIEditRoom, "UIEditRoom") end, },
+     { text = _A.tutorial.information_window,           -- 16
+-      begin_callback = function() TheApp.ui:getWindow(UIInformation):startButtonBlinking(1) end,
+-      end_callback = function() TheApp.ui:getWindow(UIInformation):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIInformation, "UIInformation", 1) end,
++      end_callback = function() tutorial_stop_blink(UIInformation, "UIInformation") end, },
+   },
+ 
+   {
+     -- 4) hire doctor
+     { text = _A.tutorial.hire_doctor,                  -- 1
+-      begin_callback = function() TheApp.ui:getWindow(UIBottomPanel):startButtonBlinking(5) end,
+-      end_callback = function() TheApp.ui:getWindow(UIBottomPanel):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIBottomPanel, "UIBottomPanel", 5) end,
++      end_callback = function() tutorial_stop_blink(UIBottomPanel, "UIBottomPanel") end, },
+     { text = _A.tutorial.select_doctors,               -- 2
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(1) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 1) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     { text = _A.tutorial.choose_doctor,                -- 3
+-      begin_callback = function() TheApp.ui:getWindow(UIHireStaff):startButtonBlinking(6) end,
+-      end_callback = function() TheApp.ui:getWindow(UIHireStaff):stopButtonBlinking() end, },
++      begin_callback = function() tutorial_blink(UIHireStaff, "UIHireStaff", 6) end,
++      end_callback = function() tutorial_stop_blink(UIHireStaff, "UIHireStaff") end, },
+     _A.tutorial.place_doctor,                          -- 4
+     _A.tutorial.doctor_in_invalid_position,            -- 5
+   },
 diff --git a/CorsixTH/Lua/ui.lua b/CorsixTH/Lua/ui.lua
 index 8c6cc93..98c04f5 100644
 --- a/CorsixTH/Lua/ui.lua

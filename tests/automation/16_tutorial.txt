@@ -1,0 +1,66 @@
+# The tutorial, played with the native controls: each step the adviser asks
+# for advances it (the game's own tutorialStep calls), the toolbar button,
+# hire tab and room card it points at light up, and nothing errors (its
+# callbacks used to blink buttons on game windows the native UI replaces).
+wait_until 30000 TheApp.ui ~= nil
+wait 1500
+lua require("sdl").native.post("new_game", '{"difficulty":"easy","tutorial":true}')
+wait_until 30000 TheApp.world ~= nil
+wait 2000
+lua rawset(_G, "auto_tut", function() local t = TheApp.ui.tutorial; return t and (t.chapter .. "." .. t.phase) or "none" end); return auto_tut()
+expect auto_tut() == "1.1"
+expect TheApp.native.tutorial_tool == "furnish"
+screenshot 1_start
+# 1) A reception desk.
+native_tap Furnish Corridor
+wait_until 3000 auto_tut() == "1.2"
+lua local f = TheApp.ui:getWindow(UIFurnishCorridor); for i, o in ipairs(f.objects) do if o.object.id == "reception_desk" then rawset(_G, "auto_desk", i) end end; return rawget(_G, "auto_desk")
+lua require("sdl").native.post("editor_buy", '{"index":' .. rawget(_G, "auto_desk") .. ',"delta":1}')
+wait_until 3000 auto_tut() == "1.3"
+native_tap Buy
+wait_until 3000 auto_tut() == "1.4"
+native_tap Place
+wait_until 3000 auto_tut() == "2.1"
+expect TheApp.native.tutorial_tool == "hire"
+screenshot 2_hire_next
+# 2) A receptionist: the panel opens on Reception.
+native_tap Hire Staff
+wait_until 3000 auto_tut() == "2.2"
+expect TheApp.native:state().hire.suggested == "Receptionist"
+wait 800
+screenshot 3_hire_panel
+lua local r = TheApp.native:state().hire.candidates.Receptionist[1]; rawset(_G, "auto_rec", r.name); return r.name
+lua require("sdl").native.post("hire", '{"category":"Receptionist","index":1,"name":"' .. rawget(_G, "auto_rec") .. '"}')
+wait_until 5000 auto_tut() == "3.1"
+expect TheApp.native.tutorial_tool == "build"
+lua TheApp.native:close()
+# 3) A GP's office: the catalog points at it; closing it steps back.
+native_tap Build Room
+wait_until 3000 auto_tut() == "3.2"
+expect TheApp.native:roomList()[1] ~= nil
+lua local hit; for _, r in ipairs(TheApp.native:roomList()) do if r.highlight then hit = r.id end end; rawset(_G, "auto_hl", hit); return tostring(hit)
+expect rawget(_G, "auto_hl") == "gp"
+wait 800
+screenshot 4_catalog
+lua require("sdl").native.post("dismissed", "{}")
+wait_until 3000 auto_tut() == "3.1"
+native_tap Build Room
+wait_until 3000 auto_tut() == "3.2"
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+expect auto_tut() == "3.8"
+native_tap Build
+wait_until 20000 TheApp.native.quick_build == nil
+wait_until 5000 auto_tut() == "3.16"
+lua for i = #TheApp.ui.windows, 1, -1 do local w = TheApp.ui.windows[i]; if class.is(w, UIInformation) then w:close() end end
+wait_until 3000 auto_tut() == "4.1"
+# 4) A doctor: the panel opens on Doctors. Then the tutorial ends.
+native_tap Hire Staff
+wait_until 3000 auto_tut() == "4.2"
+expect TheApp.native:state().hire.suggested == "Doctor"
+lua local d = TheApp.native:state().hire.candidates.Doctor[1]; rawset(_G, "auto_doc", d.name); return d.name
+lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_doc") .. '"}')
+wait_until 5000 auto_tut() == "5.1" or auto_tut() == "none"
+expect TheApp.native.tutorial_tool == nil
+wait 1000
+screenshot 5_done
