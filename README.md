@@ -182,7 +182,6 @@ settings. Sound effects and the announcer work as normal.
 - **Windows that are still the PC game's:** the fax machine, the staff and patient windows and the
   full-screen screens (town map, research, graphs, bank and so on) are the original 640×480 ones,
   scaled up. They work, but they're small on a phone.
-- **The adviser's card** can be partly covered by the Build Room and Hire Staff panels.
 
 [`ROADMAP.md`](ROADMAP.md) says what's planned.
 

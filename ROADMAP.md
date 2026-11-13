@@ -10,7 +10,6 @@ What's planned, roughly in order. The README's "Known issues" says what doesn't 
    desktop window resize does.
 2. **Safe areas.** Keep the game's remaining windows clear of the notch, Dynamic Island and home
    indicator (the native controls already are), using the window's safe-area insets.
-3. **Keep the adviser's card clear of the side panels** (Build Room, Hire Staff).
 
 ## Native versions of the remaining game windows
 
