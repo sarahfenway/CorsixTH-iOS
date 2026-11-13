@@ -287,6 +287,8 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
       questionAnswers = ["Cancel": { answer(false) }, yes: { answer(true) }]
     } else {
       alert.addAction(UIAlertAction(title: "OK", style: .default))
+      questionAlert = alert
+      questionAnswers = ["OK": {}]
     }
     topViewController()?.present(alert, animated: true)
   }

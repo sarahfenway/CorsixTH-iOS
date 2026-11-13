@@ -299,6 +299,21 @@ function NativeUI:interceptWindow(ui, window)
     end
     return true
   end
+  if name == "UIInformation" and not self.app.world then
+    -- A message over the main menu (why a level was lost, say): the native
+    -- menu would hide the game's box, so it's a native alert instead.
+    local lines = {}
+    for _, line in ipairs(window.text or {}) do
+      lines[#lines + 1] = json.text(line)
+    end
+    for _, extra in ipairs(window.additional_text or {}) do
+      for _, line in ipairs(extra) do
+        lines[#lines + 1] = json.text(line)
+      end
+    end
+    self:message(table.concat(lines, "\n\n"))
+    return true
+  end
   if name == "UIEditRoom" or name == "UIFurnishCorridor" or name == "UIPlaceObjects" then
     -- Shown, but driven by native controls (lua/room_editor.lua) once open.
     self.pending_adoptions = self.pending_adoptions or {}

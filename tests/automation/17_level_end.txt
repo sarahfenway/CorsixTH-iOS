@@ -1,0 +1,27 @@
+# The end of a level: winning brings the game's fax, whose accept button
+# (tapped where it is) loads the next level; losing goes back to the main
+# menu and says why in a native alert (the game's own box would be hidden
+# behind the native menu).
+wait_until 30000 TheApp.ui ~= nil
+wait 1500
+lua require("sdl").native.post("new_game", '{"difficulty":"easy","tutorial":false}')
+wait_until 30000 TheApp.world ~= nil
+wait 1500
+lua for i = #TheApp.ui.windows, 1, -1 do local w = TheApp.ui.windows[i]; if class.is(w, UIInformation) then w:close() end end
+expect TheApp.world.map.level_number == 1 and TheApp.world:isCampaign()
+lua TheApp.world:winGame(1)
+wait_until 3000 TheApp.ui:getWindow(UIFax) ~= nil
+wait 500
+screenshot 1_won
+lua local f = TheApp.ui:getWindow(UIFax); local b = f.choice_buttons[1]; rawset(_G, "auto_choice", {math.floor(f.x + b.x + 21), math.floor(f.y + b.y + 21)}); return auto_choice[1] .. "," .. auto_choice[2]
+tap_at rawget(_G, "auto_choice")
+wait_until 20000 TheApp.world ~= nil and TheApp.world.map.level_number == 2
+wait 1500
+screenshot 2_level_2
+lua for i = #TheApp.ui.windows, 1, -1 do local w = TheApp.ui.windows[i]; if class.is(w, UIInformation) then w:close() end end
+lua TheApp.world:loseGame(1, "reputation", 100)
+wait_until 10000 require("sdl").native.screen() == "main_menu"
+wait 1500
+expect TheApp.ui:getWindow(UIInformation) == nil
+screenshot 3_lost
+native_tap OK
