@@ -31,7 +31,7 @@ struct NativeRootView: View {
     }
     .id(model.navigationID)
     .alert(
-      "Theme Hospital",
+      "CorsixTH",
       isPresented: Binding(
         get: { model.alertMessage != nil }, set: { if !$0 { model.alertMessage = nil } }),
       actions: { Button("OK") { model.alertMessage = nil } },
@@ -405,7 +405,7 @@ struct MainMenuCard: View {
       Color.black.opacity(0.25).ignoresSafeArea()
       VStack(spacing: 0) {
         ZStack {
-          Text(page.flatMap { titles[$0] } ?? "Theme Hospital").font(.headline)
+          Text(page.flatMap { titles[$0] } ?? "CorsixTH").font(.headline)
           if page != nil {
             HStack {
               Button {

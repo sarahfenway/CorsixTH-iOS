@@ -18,9 +18,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. --]]
 
---! Native (SwiftUI) menus for the iOS build: the main menu, the in-game menu,
--- save/load, settings and text entry replace CorsixTH's PC-style windows.
--- See src/native_bridge.h for how the two sides talk.
+--! The native interface of the iOS build, Lua side: it builds what the native
+-- screens show and turns their actions into the game's own calls. This file
+-- has the menus (main menu, game menu, save/load, settings, text entry), Build
+-- Room and the hand-over of the game's windows; native_hud.lua has the
+-- in-game toolbar, faxes and adviser, native_hire.lua hiring and
+-- native_pictures.lua the game art. See src/native_bridge.h for how the two
+-- sides talk.
 --
 -- Nothing here is stored in save games: the object lives in TheApp.native,
 -- and App isn't persisted.
@@ -57,13 +61,6 @@ local replaced_windows = {
 -- Native screens that leave the game running (they don't cover the map).
 local unpaused_screens = { main_menu = true, room_catalog = true, hire_staff = true }
 
-local staff_categories = {
-  { id = "Doctor", title = "Doctors" },
-  { id = "Nurse", title = "Nurses" },
-  { id = "Handyman", title = "Handymen" },
-  { id = "Receptionist", title = "Reception" },
-}
-
 --! "TOXICITY" -> "Toxicity": Theme Hospital writes names in capitals.
 local function title_case(text)
   if text ~= text:upper() then
@@ -88,41 +85,6 @@ local room_categories = {
   { id = "treatment", title = "Treatment" },
   { id = "clinics", title = "Clinics" },
   { id = "facilities", title = "Facilities" },
-}
-
-local speeds = {
-  { id = "Pause", title = "Paused" },
-  { id = "Slowest", title = "Slowest" },
-  { id = "Slower", title = "Slower" },
-  { id = "Normal", title = "Normal" },
-  { id = "Max speed", title = "Fast" },
-  { id = "And then some more", title = "Fastest" },
-}
-
--- In-game windows a tap away from the menu.
-local hospital_windows = {
-  { id = "staff", picture = "staff", title = "Staff Management",
-    open = function(ui) ui.bottom_panel:dialogStaffManagement(true) end },
-  { id = "town_map", picture = "town_map", title = "Town Map",
-    open = function(ui) ui.bottom_panel:dialogTownMap(true) end },
-  { id = "research", picture = "research", title = "Research",
-    open = function(ui) ui.bottom_panel:dialogResearch(true) end },
-  { id = "casebook", picture = "casebook", title = "Casebook",
-    open = function(ui) ui.bottom_panel:dialogDrugCasebook(true) end },
-  { id = "status", picture = "status", title = "Hospital Status",
-    open = function(ui) ui.bottom_panel:dialogStatus(true) end },
-  { id = "charts", picture = "charts", title = "Graphs",
-    open = function(ui) ui.bottom_panel:dialogCharts(true) end },
-  { id = "policy", picture = "policy", title = "Policy",
-    open = function(ui) ui.bottom_panel:dialogPolicy(true) end },
-  { id = "bank", picture = "bank", title = "Bank Manager",
-    open = function(ui) ui.bottom_panel:dialogBankManager(true) end },
-  { id = "statement", picture = "bank", title = "Bank Statement",
-    open = function(ui) ui.bottom_panel:dialogBankStats(true) end },
-  { id = "adviser_history", title = "Adviser Messages",
-    open = function(ui) ui:addWindow(UIAdviserHistory(ui)) end },
-  { id = "briefing", title = "Level Briefing",
-    open = function(ui) ui:showBriefing() end },
 }
 
 local autosave_options = {
@@ -168,35 +130,6 @@ function NativeUI:refresh(message)
   local state = self:state()
   state.message = message
   SDL.native.update(json.encode(state))
-end
-
--- The bottom panel's buttons, as the tutorial numbers them, and the toolbar's.
-local tutorial_tools = { [2] = "build", [3] = "furnish", [4] = "edit", [5] = "hire" }
-
---! The tutorial wants a button to blink (game_ui.lua's tutorial_blink), or
--- stops (nil). Bottom-panel buttons light up on the toolbar; the hire and
--- build panels follow the tutorial themselves (hireState, roomList).
-function NativeUI:tutorialBlink(window, button)
-  local tool = window == "UIBottomPanel" and tutorial_tools[button] or nil
-  if tool ~= self.tutorial_tool then
-    self.tutorial_tool = tool
-    self:updateToolbar(true)
-  end
-  -- The tutorial moves on after the panel has opened: show it the new step.
-  local screen = SDL.native.screen()
-  if screen == "hire_staff" or screen == "room_catalog" then
-    self:refresh()
-  end
-end
-
---! The tutorial's chapter and phase, if it's running.
-function NativeUI:tutorialAt(chapter, ...)
-  local t = self.app.ui and self.app.ui.tutorial
-  if not t or t.chapter ~= chapter then return false end
-  for _, phase in ipairs({ ... }) do
-    if t.phase == phase then return true end
-  end
-  return false
 end
 
 --! Shows a native alert.
@@ -487,287 +420,6 @@ function NativeUI:findCampaigns()
   return campaigns
 end
 
---! Folder for pictures of the game's art made for native menus. They come
--- from the player's own Theme Hospital data, so they're made on the device
--- (once) rather than shipped.
-function NativeUI:pictureDir()
-  if not self.picture_dir then
-    local caches = (os.getenv("HOME") or ".") .. "/Library/Caches"
-    lfs.mkdir(caches)
-    self.picture_dir = caches .. "/CorsixTH/"
-    lfs.mkdir(self.picture_dir)
-  end
-  return self.picture_dir
-end
-
---! A picture of the room, as Theme Hospital's Build Room window previews it.
--- Returns the PNG's path, or nil.
-function NativeUI:roomPicture(room)
-  local anim_id = room.build_preview_animation
-  if not anim_id then
-    return nil
-  end
-  local path = self:pictureDir() .. ("room_%s_v2.png"):format(room.id)
-  if not lfs.attributes(path, "size") then
-    local anim = TH.animation()
-    anim:setAnimation(self.app.anims, anim_id)
-    -- The same frame and anchor as the preview box in UIBuildRoom.
-    local ok, err = SDL.native.renderToPNG(path, 140, 124, function()
-      anim:draw(self.app.video, 70, 54)
-    end)
-    if not ok then
-      print("Native UI: couldn't make a picture of " .. room.id .. ": " .. tostring(err))
-      return nil
-    end
-  end
-  return path
-end
-
--- The hire window's background blues: the icons below sit on them, and
--- shades show through the abacus's frame and under the computer.
-local panel_blue = { { 61, 174, 202 }, { 45, 146, 186 }, { 49, 154, 190 }, { 57, 166, 198 },
-  { 36, 138, 178 }, { 69, 182, 206 }, { 28, 121, 170 }, { 0, 77, 113 }, { 0, 65, 109 },
-  { 0, 93, 121 }, { 32, 130, 174 } }
-
--- Pictures from the game's sprite sheets: {sheet folder, sheet, sprite, crop,
--- colours to make see-through, version}. The crop (x, y, w, h) is the part of
--- the sprite to keep (all of it if nil).
-local sprites = {
-  -- Bottom panel buttons (UIBottomPanel:drawPanels), the face of each button.
-  bank = { "Data", "Panel02V", 1, { 6, 6, 35, 36 } },
-  build = { "Data", "Panel02V", 4, { 6, 6, 35, 36 } },
-  furnish = { "Data", "Panel02V", 6, { 1, 6, 35, 36 } },
-  edit = { "Data", "Panel02V", 8, { 1, 6, 35, 36 } },
-  hire = { "Data", "Panel02V", 10, { 1, 6, 35, 36 } },
-  staff = { "Data", "Panel02V", 15, { 6, 6, 35, 36 } },
-  town_map = { "Data", "Panel02V", 17, { 1, 6, 35, 36 } },
-  casebook = { "Data", "Panel02V", 19, { 1, 6, 35, 36 } },
-  research = { "Data", "Panel02V", 21, { 1, 6, 35, 36 } },
-  status = { "Data", "Panel02V", 23, { 1, 6, 35, 36 } },
-  charts = { "Data", "Panel02V", 25, { 1, 6, 35, 36 } },
-  policy = { "Data", "Panel02V", 27, { 1, 6, 35, 36 } },
-  -- Fax messages on the bottom panel (UIMessage), one per kind.
-  fax_emergency = { "Data", "Panel02V", 43 },
-  fax_epidemy = { "Data", "Panel02V", 45 },
-  fax_strike = { "Data", "Panel02V", 47 },
-  fax_personality = { "Data", "Panel02V", 49 },
-  fax_information = { "Data", "Panel02V", 51 },
-  fax_disease = { "Data", "Panel02V", 53 },
-  fax_report = { "Data", "Panel02V", 55 },
-  -- The hire window (UIHireStaff, QData/Req11V): a doctor's qualifications,
-  -- and the abacus and computer at the ends of the skill bar (on the panel's
-  -- blue, which is keyed out).
-  surgeon = { "QData", "Req11V", 292, nil, panel_blue, 3 },
-  psychiatrist = { "QData", "Req11V", 293, nil, panel_blue, 3 },
-  researcher = { "QData", "Req11V", 294, nil, panel_blue, 3 },
-  abacus = { "QData", "Req11V", 259, { 0, 4, 16, 17 }, panel_blue, 4 },
-  computer = { "QData", "Req11V", 259, { 66, 2, 17, 21 }, panel_blue, 4 },
-}
-
---! A picture of one of the game's sprites (see `sprites`). Returns the PNG's
--- path, or nil.
-function NativeUI:spritePicture(name)
-  if not name then
-    return nil
-  end
-  self.pictures = self.pictures or {}
-  if self.pictures[name] ~= nil then
-    return self.pictures[name] or nil
-  end
-  local info = sprites[name]
-  -- info[6], if given, is the picture's own version (bump it when changing it).
-  local path = info and self:pictureDir() .. ("sprite_%s_v%d.png"):format(name, info[6] or 2)
-  if path and not lfs.attributes(path, "size") then
-    local ok, err = pcall(function()
-      local sheet = self.app.gfx:loadSpriteTable(info[1], info[2], true)
-      -- The whole sprite unless a crop ({x, y, w, h}) is given.
-      local crop = info[4] or { 0, 0, sheet:size(info[3]) }
-      local done, why = SDL.native.renderToPNG(path, crop[3], crop[4], function()
-        sheet:draw(self.app.video, info[3], -crop[1], -crop[2])
-      end, info[5])
-      if not done then error(why) end
-    end)
-    if not ok then
-      print("Native UI: couldn't make a picture of " .. name .. ": " .. tostring(err))
-      path = nil
-    end
-  end
-  self.pictures[name] = path or false
-  return path
-end
-
---! A picture of the adviser, as the game shows him talking (UIAdviser).
-function NativeUI:adviserPicture()
-  local path = self:pictureDir() .. "adviser_v1.png"
-  if self.adviser_picture_failed then
-    return nil
-  end
-  if not lfs.attributes(path, "size") then
-    local anim = TH.animation()
-    anim:setAnimation(self.app.world.anims, 460, DrawFlags.Nearest)
-    -- A big canvas; the empty part is trimmed off.
-    local ok, err = SDL.native.renderToPNG(path, 200, 200, function()
-      anim:draw(self.app.video, 100, 120)
-    end)
-    if not ok then
-      print("Native UI: couldn't make a picture of the adviser: " .. tostring(err))
-      self.adviser_picture_failed = true
-      return nil
-    end
-  end
-  return path
-end
-
---! What the adviser is saying, while the game has him saying it (his speech
--- bubble), or nil. The game keeps his queue, timing and history as ever.
-function NativeUI:adviserState()
-  local adviser = self.app.ui and self.app.ui.adviser
-  if not adviser or not adviser.speech or (adviser.phase ~= 2 and adviser.phase ~= 3) then
-    return nil
-  end
-  -- Trailing "/"s are the game's blank lines.
-  local text = json.text(adviser.speech):gsub("/+$", "")
-  return { text = text, more = #adviser.queued_messages, face = self:adviserPicture() }
-end
-
---! A picture of a job candidate's face, drawn by the game as the hire window
--- does (StaffProfile:drawFace). Returns the PNG's path, or nil.
-function NativeUI:facePicture(profile)
-  if not (profile.hair_index and profile.face_index and profile.chin_index) then
-    return nil
-  end
-  local path = self:pictureDir() .. ("face_%d_%d_%d_v1.png"):format(profile.hair_index,
-      profile.face_index, profile.chin_index)
-  if lfs.attributes(path, "size") then
-    return path
-  end
-  local ok, err = pcall(function()
-    -- The same face parts as UIHireStaff.
-    self.face_parts = self.face_parts or self.app.gfx:loadRaw("Face01V", 65, 1350, nil, "Data",
-        "MPalette.dat", false, { flags = DrawFlags.Nearest })
-    local done, why = SDL.native.renderToPNG(path, 65, 75, function()
-      profile:drawFace(self.app.video, 0, 0, self.face_parts, 1)
-    end)
-    if not done then error(why) end
-  end)
-  if not ok then
-    print("Native UI: couldn't make a picture of a face: " .. tostring(err))
-    return nil
-  end
-  return path
-end
-
---! The job candidates, as UIHireStaff shows them.
-function NativeUI:hireState()
-  local world, hospital = self.app.world, self.app.ui.hospital
-  local categories, candidates = {}, {}
-  for _, category in ipairs(staff_categories) do
-    local list = {}
-    for index, profile in ipairs(world.available_staff[category.id] or {}) do
-      local rank
-      if category.id == "Doctor" then
-        rank = profile.is_consultant and "Consultant" or profile.is_junior and "Junior" or "Doctor"
-      end
-      list[#list + 1] = {
-        index = index,
-        name = json.text(profile:getFullName()),
-        display_name = title_case(json.text(profile:getFullName())),
-        wage = NativeUI.formatMoney(profile.wage), -- A month.
-        affordable = hospital.balance >= profile.wage,
-        skill = profile.skill,
-        rank = rank,
-        surgeon = (profile.is_surgeon or 0) >= 1.0,
-        psychiatrist = (profile.is_psychiatrist or 0) >= 1.0,
-        researcher = (profile.is_researcher or 0) >= 1.0,
-        description = profile.desc and json.text(profile.desc) or "",
-        face = self:facePicture(profile),
-      }
-      if category.id == "Doctor" then
-        local item = list[#list]
-        item.surgeon_icon = item.surgeon and self:spritePicture("surgeon") or nil
-        item.psychiatrist_icon = item.psychiatrist and self:spritePicture("psychiatrist") or nil
-        item.researcher_icon = item.researcher and self:spritePicture("researcher") or nil
-      end
-    end
-    categories[#categories + 1] = { id = category.id, title = category.title }
-    candidates[category.id] = list
-  end
-  -- The tutorial asks for a receptionist, then a doctor: open on that tab.
-  local suggested = self:tutorialAt(2, 2, 3, 4, 5) and "Receptionist" or
-      self:tutorialAt(4, 2, 3) and "Doctor" or nil
-  return { categories = categories, candidates = candidates, suggested = suggested,
-    abacus = self:spritePicture("abacus"), computer = self:spritePicture("computer") }
-end
-
---! Puts a newly hired person (in a UIPlaceStaff that's waiting for a click)
--- somewhere sensible, by "clicking" there: the game checks the tile and
--- does the rest. Receptionists go to an unstaffed reception desk if there is
--- one; everyone else to a corridor near the middle of the screen, from where
--- the game calls them to rooms that need them. Returns true if placed.
-function NativeUI:placeStaff(placer)
-  local app, ui, world = self.app, self.app.ui, self.app.world
-  if not world.user_actions_allowed then
-    return false
-  end
-  local function try(x, y)
-    placer.tile_x, placer.tile_y = x, y
-    if placer:_isValidStaffPlacement() then
-      placer:onMouseUp("left", 0, 0)
-      return true
-    end
-    return false
-  end
-  if placer.profile:isType("Receptionist") then
-    for _, objects in pairs(world.objects) do
-      for _, object in ipairs(objects) do
-        if object.object_type.id == "reception_desk" and not object.receptionist and
-            try(object.tile_x, object.tile_y) then
-          return true
-        end
-      end
-    end
-  end
-  local cx, cy = ui:ScreenToWorld(app.config.width / 2, app.config.height / 2)
-  cx, cy = math.floor(cx), math.floor(cy)
-  for radius = 0, 30 do
-    for dy = -radius, radius do
-      for dx = -radius, radius do
-        if math.max(math.abs(dx), math.abs(dy)) == radius then
-          local x, y = cx + dx, cy + dy
-          if x >= 1 and y >= 1 and x <= app.map.width and y <= app.map.height and
-              world:getRoom(x, y) == nil and try(x, y) then
-            return true
-          end
-        end
-      end
-    end
-  end
-  return false
-end
-
---! A picture of an item (as the game's buying window previews it). Returns
--- the PNG's path, or nil.
-function NativeUI:objectPicture(object)
-  local anim_id = object and object.build_preview_animation
-  if not anim_id then
-    return nil
-  end
-  local path = self:pictureDir() .. ("object_%s_v1.png"):format(object.id)
-  if not lfs.attributes(path, "size") then
-    local anim = TH.animation()
-    anim:setAnimation(self.app.anims, anim_id)
-    -- UIFurnishCorridor draws it at (72, 57) in its preview box.
-    local ok, err = SDL.native.renderToPNG(path, 160, 130, function()
-      anim:draw(self.app.video, 80, 60)
-    end)
-    if not ok then
-      print("Native UI: couldn't make a picture of " .. object.id .. ": " .. tostring(err))
-      return nil
-    end
-  end
-  return path
-end
-
 --! The rooms the player can build now, as UIBuildRoom lists them.
 function NativeUI:roomList()
   local app = self.app
@@ -852,110 +504,7 @@ local function format_money(amount)
   return (amount < 0 and "-$" or "$") .. text
 end
 NativeUI.formatMoney = format_money
-
-function NativeUI:toolbarState()
-  local app = self.app
-  local world, ui = app.world, app.ui
-  local hospital = ui and ui.hospital
-  if not world or not hospital then
-    return nil
-  end
-  local date = world:date()
-  local panel = ui.bottom_panel
-  local faxes, waiting = self:faxState(panel)
-  local windows = {}
-  for _, w in ipairs(hospital_windows) do
-    windows[#windows + 1] = { id = w.id, title = w.title, image = self:spritePicture(w.picture) }
-  end
-  local icons = {}
-  for _, tool in ipairs({ "build", "furnish", "edit", "hire" }) do
-    icons[tool] = self:spritePicture(tool)
-  end
-  return {
-    icons = icons,
-    highlight = self.tutorial_tool,
-    money = format_money(hospital.balance),
-    date = _S.date_format.daymonth:format(date:dayOfMonth(), date:monthOfYear()),
-    reputation = (hospital.reputation or 500) / 1000,
-    faxes = faxes,
-    faxes_waiting = waiting,
-    adviser = self:adviserState(),
-    speed = world:getCurrentSpeed(),
-    speeds = speeds,
-    windows = windows,
-  }
-end
-
-local fax_titles = {
-  emergency = "Emergency", epidemy = "Epidemic", strike = "Pay demand", personality = "VIP visit",
-  information = "Information", disease = "New disease", report = "Report",
-}
-
--- How long each timed fax had when first seen (UIMessage only counts down).
-local fax_timeouts = setmetatable({}, { __mode = "k" })
-
---! The fax messages on the bottom panel, as the game shows them (at most five,
--- one of each kind, oldest first), and how many more are waiting behind them.
-function NativeUI:faxState(panel)
-  local faxes = {}
-  if not panel then
-    return faxes, 0
-  end
-  for i, icon in ipairs(panel.message_windows) do
-    local time_left
-    if icon.timer then
-      fax_timeouts[icon] = math.max(fax_timeouts[icon] or 0, icon.timer)
-      -- In twentieths, so the toolbar isn't resent every tick.
-      time_left = math.ceil(icon.timer / fax_timeouts[icon] * 20) / 20
-    end
-    faxes[#faxes + 1] = {
-      index = i,
-      kind = icon.type,
-      title = fax_titles[icon.type] or "Message",
-      image = self:spritePicture("fax_" .. tostring(icon.type)),
-      open = icon.fax ~= nil,
-      dismissable = icon.can_dismiss and true or false,
-      time_left = time_left,
-    }
-  end
-  return faxes, #panel.message_queue
-end
-
---! Sends the toolbar's state when it changed (or always, when forced).
-function NativeUI:updateToolbar(force)
-  local state = self:toolbarState()
-  local text = state and json.encode(state) or ""
-  if force or text ~= self.toolbar_json then
-    self.toolbar_json = text
-    SDL.native.setToolbar(state and text or nil)
-  end
-end
-
---! Called every game tick (GameUI:onTick).
--- Game windows that aren't dialogs: touches on them stay trackpad touches.
-local not_dialogs = {
-  UIMenuBar = true, UIBottomPanel = true, UIPlaceStaff = true, Subtitles = true,
-}
-
---! Tells the touch code where the game's own dialogs are (faxes, information
---! boxes, the opening countdown), so a finger presses their buttons directly
---! rather than through the trackpad cursor.
-function NativeUI:updateDirectRegions()
-  local regions, keys = {}, {}
-  for _, window in ipairs(self.app.ui and self.app.ui.windows or {}) do
-    if window.visible ~= false and window.width and window.height
-        and window.x and window.x > editing.OFFSCREEN / 2
-        and not not_dialogs[class.type(window)] then
-      regions[#regions + 1] = { window.x, window.y, window.width, window.height }
-      keys[#keys + 1] = table.concat(regions[#regions], ",")
-    end
-  end
-  local key = table.concat(keys, ";")
-  if key ~= self.direct_regions_key then
-    self.direct_regions_key = key
-    SDL.native.setDirectRegions(regions)
-  end
-end
+NativeUI.titleCase = title_case
 
 function NativeUI:onTick()
   self.tick_count = (self.tick_count or 0) + 1
@@ -1018,31 +567,6 @@ function actions.dismissed(self)
   end
 end
 
-local tools = {
-  build = function(panel) panel:dialogBuildRoom() end,
-  furnish = function(panel) panel:dialogFurnishCorridor() end,
-  edit = function(panel) panel:editRoom() end,
-  hire = function(panel) panel:dialogHireStaff() end,
-}
-
-function actions.tool(self, p)
-  local ui = self.app.ui
-  local panel = ui and ui.bottom_panel
-  if panel and tools[p.id] then
-    tools[p.id](panel)
-    if p.id == "edit" then
-      -- The game is now waiting for a room to be clicked: touch picks it.
-      if self.editor then
-        self.editor:finish()
-        self.editor = nil
-      end
-      if ui.edit_room == true then
-        self.editor = editing.RoomPicker.start(self)
-      end
-    end
-  end
-end
-
 function actions.editor_button(self, p)
   if self.editor then self.editor:pressed(p.id) end
 end
@@ -1066,59 +590,6 @@ function actions.quick_build_customise(self)
   if edit then
     self.quick_build = nil
     self.editor = editing.RoomEditor.adopt(self, edit, door)
-  end
-end
-
-function actions.toolbar_speed(self, p)
-  local world = self.app.world
-  if world and p.speed then
-    world:setSpeed(p.speed)
-    self:updateToolbar(true)
-  end
-end
-
---! Opens (or closes, if open) a fax, as clicking its icon does.
-function actions.open_message(self, p)
-  local panel = self.app.ui and self.app.ui.bottom_panel
-  local icon = panel and panel.message_windows[p.index or 1]
-  if icon then
-    icon:openMessage()
-    self:updateToolbar(true)
-  end
-end
-
---! The adviser's next message, or he goes away: as clicking him does.
-function actions.adviser_next(self)
-  local adviser = self.app.ui and self.app.ui.adviser
-  if adviser and adviser.phase ~= 0 and adviser.phase ~= 4 then
-    if #adviser.queued_messages > 0 then
-      adviser:talk()
-    else
-      adviser:hide()
-    end
-    self:updateToolbar(true)
-  end
-end
-
---! The adviser goes away with everything he still had to say (it stays in
--- his history): as right-clicking him does.
-function actions.adviser_dismiss(self)
-  local adviser = self.app.ui and self.app.ui.adviser
-  if adviser and adviser.phase ~= 0 and adviser.phase ~= 4 then
-    adviser:hide()
-    adviser:addQueuedMessagesToHistory()
-    adviser.queued_messages = {}
-    self:updateToolbar(true)
-  end
-end
-
---! Dismisses a fax, as right-clicking its icon does (when the game allows).
-function actions.dismiss_message(self, p)
-  local panel = self.app.ui and self.app.ui.bottom_panel
-  local icon = panel and panel.message_windows[p.index or 1]
-  if icon then
-    icon:dismissMessage()
-    self:updateToolbar(true)
   end
 end
 
@@ -1163,40 +634,6 @@ function actions.pick_room(self, p)
   ui:addWindow(UIEditRoom(ui, room))
 end
 
-function actions.hire(self, p)
-  local app = self.app
-  local ui, world = app.ui, app.world
-  if not world or not ui.hospital then return end
-  local pool = world.available_staff[p.category]
-  local profile = pool and pool[tonumber(p.index) or 0]
-  -- The list changes every month; only hire the person the player saw.
-  if not profile or json.text(profile:getFullName()) ~= p.name then
-    self:refresh("That person is no longer available.")
-    return
-  end
-  -- As UIHireStaff:hire. (The native panel has no tab or next/previous steps
-  -- for the tutorial to wait for, so it moves on from any of them.)
-  ui:tutorialStep(2, { 2, 3, 4, 5 }, 6)
-  ui:tutorialStep(4, { 2, 3 }, 4)
-  if ui.hospital.balance < profile.wage then
-    UIHireStaff.cannotAfford({ world = world })
-    ui:playSound("wrong2.wav")
-    return
-  end
-  ui:playSound("YesX.wav")
-  table.remove(pool, tonumber(p.index))
-  local placer = UIPlaceStaff(ui, profile, app.config.width / 2, app.config.height / 2)
-  ui:addWindow(placer)
-  if not self:placeStaff(placer) then
-    -- The game's own placement carries on: the person follows the cursor
-    -- until the player taps where they should go.
-    SDL.native.dismiss()
-    self:message("Tap where " .. json.text(profile:getFullName()) .. " should start work.")
-    return
-  end
-  self:refresh()
-end
-
 function actions.quick_build_drag(self, p)
   if self.quick_build then
     self.quick_build:drag(p.handle, tonumber(p.x) or 0, tonumber(p.y) or 0, p.ended)
@@ -1208,7 +645,6 @@ function actions.quick_build_build(self)
     self.quick_build:build()
   end
 end
-
 
 function actions.quick_build_cancel(self)
   local qb = self.quick_build
@@ -1241,16 +677,6 @@ end
 function actions.set_speed(self, p)
   if self.app.world and p.speed then
     self.resume_speed = p.speed
-  end
-end
-
-function actions.open_window(self, p)
-  local ui = self.app.ui
-  self:close()
-  for _, w in ipairs(hospital_windows) do
-    if w.id == p.id and ui.bottom_panel then
-      w.open(ui)
-    end
   end
 end
 
@@ -1465,6 +891,18 @@ function actions.text_input_cancel(self, p)
 end
 
 --! Handles an action from the native UI (App:onNativeAction).
+-- The rest of NativeUI lives in its own files; their methods and actions
+-- join these.
+for _, part in ipairs({ "ios.native_pictures", "ios.native_hud", "ios.native_hire" }) do
+  local module = corsixth.require(part)
+  for name, method in pairs(module.methods) do
+    NativeUI[name] = method
+  end
+  for name, action in pairs(module.actions) do
+    actions[name] = action
+  end
+end
+
 function NativeUI:onAction(action, payload)
   local handler = actions[action]
   if not handler then

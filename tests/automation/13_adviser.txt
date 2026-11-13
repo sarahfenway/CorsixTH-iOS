@@ -14,9 +14,11 @@ expect corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser.m
 expect lfs.attributes(corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser.face or "", "size") ~= nil
 wait 500
 screenshot 1_adviser
-# Tap: the next message.
+# Tap: the next message. (He also moves on by himself after a while, so
+# check against wherever he is now.)
+lua local a = TheApp.ui.adviser; rawset(_G, "auto_next", a.queued_messages[1] and a.queued_messages[1].speech or nil); return tostring(rawget(_G, "auto_next"))
 native_tap Adviser
-wait_until 3000 (corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser or {}).text == "Second test message."
+wait_until 3000 rawget(_G, "auto_next") == nil or (corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser or {}).text == rawget(_G, "auto_next")
 # Dismiss All: he goes, and what he didn't get to say is in his history.
 lua require("sdl").native.post("adviser_dismiss", "{}")
 wait_until 5000 corsixth.require("ios.json").decode(TheApp.native.toolbar_json).adviser == nil

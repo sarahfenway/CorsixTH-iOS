@@ -236,7 +236,7 @@ choose_team() {
   if [ ! -t 0 ]; then
     die "Not running in a terminal, so can't ask which team to use. Set TEAM_ID=XXXXXXXXXX."
   fi
-  echo "    Type the number of the team that should sign Theme Hospital, or a 10-character"
+  echo "    Type the number of the team that should sign the app, or a 10-character"
   echo "    team ID, or just press Return to choose it in Xcode instead."
   answer=""
   read -r -p "    Team: " answer || answer=""
@@ -316,7 +316,14 @@ print(found)' "$1"
   # A screenshot of the simulator. A foldable has two screens and simctl won't
   # pick one, so then take each and keep the one showing something (the
   # folded-away screen is black, which compresses to the smallest file).
+  # The screen found last time is tried first (unless the phone was unfolded
+  # since, it's still the lit one).
+  sim_display=""
   sim_screenshot() {
+    if [ -n "$sim_display" ]; then
+      xcrun simctl io "$1" screenshot --display="$sim_display" "$2" >/dev/null 2>&1 \
+        && [ "$(wc -c < "$2")" -gt 100000 ] && return
+    fi
     xcrun simctl io "$1" screenshot "$2" >/dev/null 2>&1 && return
     best_size=0
     for display in $(xcrun simctl io "$1" screenshot "$2" 2>&1 | sed -n 's/.*--display=\([^ ]*\).*/\1/p'); do
@@ -324,6 +331,7 @@ print(found)' "$1"
       size=$(wc -c < "$2.try.png")
       if [ "$size" -gt "$best_size" ]; then
         best_size=$size
+        sim_display=$display
         mv "$2.try.png" "$2"
       fi
     done
@@ -458,5 +466,5 @@ xcodebuild -project "$PROJECT" -scheme CorsixTH -configuration Release \
 APP="$BUILD_DIR/Release-iphoneos/CorsixTH.app"
 [ -d "$APP" ] || APP="$(find "$BUILD_DIR" -name CorsixTH.app -path '*iphoneos*' | head -1)"
 xcrun devicectl device install app --device "$DEVICE" "$APP"
-say "Installed. Look for \"Theme Hospital\" on your home screen."
+say "Installed. Look for \"CorsixTH\" on your home screen."
 note "First time only: Settings > General > VPN & Device Management > trust your Apple ID."

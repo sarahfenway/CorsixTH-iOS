@@ -1,9 +1,9 @@
-# Theme Hospital for iPhone and iPad
+# CorsixTH for iPhone and iPad
 
 This builds **CorsixTH**, the open-source rebuild of the Theme Hospital engine, as an iOS app
 with a touch-first, native iOS interface: Liquid Glass toolbars, native menus and panels, and
-building, furnishing and hiring by touch. It uses the graphics, sounds and levels from your own
-GOG copy of the game. The original game's program isn't used at all, so nothing gets decompiled.
+building, furnishing and hiring by touch. It plays Theme Hospital using the graphics, sounds and
+levels from your own GOG copy of the game. The original game's program isn't used at all, so nothing gets decompiled.
 Your game data is bundled into the app, so there's nothing to copy across afterwards.
 
 This repository holds only this project's own code. The build script downloads CorsixTH and the
@@ -50,7 +50,7 @@ Every app needs a bundle ID that no other developer has registered. The default,
 form (any name you like):
 
 ```bash
-BUNDLE_ID=com.yourname.themehospital bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
+BUNDLE_ID=com.yourname.corsixth bash build-ios.sh ~/Downloads/theme_hospital_enUS_1_0_3_33062_1.pkg
 ```
 
 It's remembered in `.bundle-id`, so later runs don't need it.
@@ -104,7 +104,7 @@ If you'd rather click wherever you touch, set `touch_controls = [[direct]]` in
 | Two-finger drag / pinch | Moves the map / zooms |
 
 Menus are native iOS screens. In a game, money, the date and reputation are at the top left, with
-an envelope when a message (fax) is waiting. The toolbar at the top right has:
+any fax messages under them. The toolbar at the top right has:
 
 - **Build Room:** a panel lists the rooms with pictures. Pick one and the game suggests a spot;
   drag the handles to move or resize it. **Build** places the door and the required furniture for
@@ -125,16 +125,26 @@ an envelope when a message (fax) is waiting. The toolbar at the top right has:
 
 While placing anything, the item starts somewhere it fits. Drag anywhere to move it (it moves as
 far as your finger, so your finger never hides it) or tap where it should go, then press **Place**,
-which only lights up where the item fits. A long press on a placed item picks it up again. What the adviser says appears at the bottom left (tap for his next message; long press to dismiss
-them all; past ones are under Hospital > Adviser Messages). Fax messages appear under the money as
-the game's own icons (tap to open; long press to
-dismiss the ones you can), with a bar on those that run out. Text entry uses the iOS keyboard. On an iPad,
-a real trackpad or mouse works too, including right click.
+which only lights up where the item fits. A long press on a placed item picks it up again.
+
+- **The adviser** speaks from a card at the bottom left: tap for his next message, long press to
+  dismiss them all. Past messages are under Hospital > Adviser Messages.
+- **Faxes** appear under the money as the game's own icons, with a bar on those that run out. Tap
+  one to open it; long press to dismiss the ones you can. Up to five show, as in the game, with
+  "+N" for any waiting behind them.
+- **The tutorial** (New Game > Tutorial) works with these controls: the button, tab or room it
+  wants you to tap pulses yellow.
+- **The game's own windows** that are still there (the fax machine, information boxes, staff and
+  patient windows, the town map, research, graphs, bank and the other full-screen screens) take
+  taps where your finger lands, even in trackpad mode.
+
+Text entry uses the iOS keyboard. On an iPad, a real trackpad or mouse works too, including right
+click.
 
 ## Saves, settings and music
 
 **Saves go to iCloud Drive**, so they survive reinstalling the app and are shared with your iPad.
-They're in a "Theme Hospital" folder in iCloud Drive (Files app, or Finder on a Mac), under `Saves`.
+They're in a "CorsixTH" folder in iCloud Drive (Files app, or Finder on a Mac), under `Saves`.
 If you're not signed in to iCloud, or the app was built with a free Apple ID, saves stay on the
 phone in `CorsixTH/Saves` instead. Any saves already on the phone are copied into iCloud the first
 time it's available.
@@ -147,7 +157,7 @@ the menu. The usual monthly autosaves and your own named saves work as before.
 The game's console output goes to `Logs/console.txt` in the same iCloud folder. It's handy when
 something goes wrong.
 
-The app's own Documents folder appears in the Files app under On My iPhone > Theme Hospital, and in
+The app's own Documents folder appears in the Files app under On My iPhone > CorsixTH, and in
 Finder when the phone is plugged in:
 
 - `CorsixTH/config.txt`: settings
@@ -158,10 +168,21 @@ and the music setting starts switched off. If you put `.mp3`, `.ogg`, `.flac` or
 folder called `CorsixTH/Music`, they become the soundtrack. Switch music back on in the game's
 settings. Sound effects and the announcer work as normal.
 
-## Not included yet
+## Known issues
 
-- The intro and cut-scene movies. They'd need FFmpeg built for iOS.
-- MIDI music (see above).
+- **Folding or unfolding a foldable iPhone, and iPad Split View or Stage Manager:** the game picks
+  its resolution when it starts and doesn't adapt yet when the screen changes size. Quit and reopen
+  the app after folding or unfolding.
+- **Notch and Dynamic Island:** the native controls keep clear of them, but the game's own picture
+  (and its few remaining windows) can be drawn underneath.
+- **Music:** none unless you add your own (see above). No intro or cut-scene movies either: they'd
+  need FFmpeg built for iOS.
+- **Windows that are still the PC game's:** the fax machine, the staff and patient windows and the
+  full-screen screens (town map, research, graphs, bank and so on) are the original 640×480 ones,
+  scaled up. They work, but they're small on a phone.
+- **The adviser's card** can be partly covered by the Build Room and Hire Staff panels.
+
+[`ROADMAP.md`](ROADMAP.md) says what's planned.
 
 ## Troubleshooting
 
@@ -172,7 +193,7 @@ settings. Sound effects and the announcer work as normal.
   needed), then build again. To skip iCloud entirely, use `ICLOUD=OFF bash build-ios.sh`.
 - **"Bundle identifier is not available":** another team has already registered that bundle ID
   (yours, if Xcode first tried to sign with a different team: it registers the ID with whichever
-  team it uses), or you're still on the `com.example` placeholder. Pick a new one, `BUNDLE_ID=com.yourname.themehospital bash
+  team it uses), or you're still on the `com.example` placeholder. Pick a new one, `BUNDLE_ID=com.yourname.corsixth bash
   build-ios.sh`, or delete it from the other team at developer.apple.com > Certificates,
   Identifiers & Profiles > Identifiers.
 - **CMake errors:** the whole log is in `build-ios.cmake.log`.
@@ -183,32 +204,50 @@ settings. Sound effects and the announcer work as normal.
 
 ## How the port is put together
 
-This project's own code is in `src/` and is compiled into the app alongside CorsixTH:
+CorsixTH is a C++ engine with the game's rules and interface written in Lua. This project leaves
+the rules alone: every native control drives CorsixTH's own windows and functions, so the game
+still does every check and charge. Our code:
 
-- `touch_gestures.*`: turns touches into mouse actions, in trackpad or direct mode. It has unit
-  tests in `tests/test_touch_gestures.cpp`.
-- `touch_ui.*`: iOS start-up. It keeps config in Documents, finds the bundled data, picks a
-  resolution that fits the screen (at least 640x480 game pixels, scaled up with sharp pixels) and
-  sets the SDL hints.
-- `touch_storage.*`, `ios_platform.*`: iCloud Drive saves, moving older saves across, and the
-  console log file. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
-- `touch_automation.*`: scripted test runs in the simulator (`build-ios.sh --run tests/automation`).
-- `native_bridge.*` and `ios/*.swift` (SwiftUI/UIKit), with `lua/native_ui.lua`: the native main
-  menu, game menu, save/load, settings, text entry and the in-game toolbar, which replace
-  CorsixTH's PC-style menus, dialogs and bottom panel.
+- `src/touch_gestures.*`: turns touches into mouse actions (trackpad, direct, and the pointer mode
+  used for placing). Pure C++ with unit tests in `tests/test_touch_gestures.cpp`.
+- `src/touch_ui.*`: iOS start-up (config in Documents, the bundled data, a resolution of at least
+  640×480 game pixels scaled up with sharp pixels, SDL hints) and the touch event glue, including
+  sending taps on the game's remaining windows to where the finger is.
+- `src/touch_storage.*`, `src/ios_platform.*`: iCloud Drive saves, moving older saves across, and
+  the console log. `touch_storage` has tests in `tests/test_touch_storage.cpp`.
+- `src/native_bridge.*`: the `SDL.native` Lua module. Lua sends JSON to the native screens; they
+  post actions back, which the game's main loop hands to Lua. It can also draw the game's own art
+  into PNGs for the native screens (room pictures, toolbar icons, faces), made on the device from
+  the player's data.
+- `src/ios/*.swift`: the native interface. SwiftUI for the main menu, game menu, save/load,
+  settings, Build Room and Hire Staff; UIKit for the Liquid Glass toolbar, fax and adviser cards and
+  the building overlays. They sit in their own layer above the game's Metal view.
+- `lua/native_ui.lua` and friends (copied into the app as `Lua/ios/`): the native side of the game.
+  They build what the screens show and turn taps into the game's own calls.
+  - `quick_build.lua`, `room_planner.lua`: Quick Build. It proposes a room using the same tile rule
+    as the engine, then drives a hidden room editor through walls, door, windows and furniture.
+  - `room_editor.lua`: the step-by-step room editor and corridor furnishing (wall markers, the item
+    tray, move-then-Place).
+- `src/touch_automation.*`: scripted test runs in the simulator (`build-ios.sh --run
+  tests/automation`), with real touch events and screenshots.
 
-`patches/corsixth-ios.patch` makes the small changes needed in CorsixTH's own files:
+`patches/corsixth-ios.patch` is the set of small hooks in CorsixTH's own files:
 
-- `sdl_core.cpp`: routes touch events through the above, and stops drawing while the app is in
-  the background.
-- `th_gfx_sdl.cpp`: creates a full-screen, high-DPI window on iOS.
+- `sdl_core.cpp`: routes touch events through the above, replaces SDL's own pinch detection (which
+  read every wobble of a two-finger pan as a zoom), and stops drawing in the background.
+- `th_gfx_sdl.cpp`: a full-screen, high-DPI window on iOS.
 - `sdl_wm.cpp`, `window.lua`, `ui.lua`: the on-screen keyboard for text boxes.
-- `game_ui.lua`: pinch zoom on touch screens, also while panning.
-- `app.lua`: saving when the app goes into the background, and resuming on launch.
-- `app.lua`, `config_finder.lua`: iOS settings (resolution, bundled data, touch controls, no
-  edge scrolling, music off without music files).
-- `ui.lua`, `menu.lua`, `bottom_panel.lua`, `window.lua`, `game_ui.lua`: hooks that hand menus,
-  file dialogs, text boxes and the bottom panel to the native UI.
+- `game_ui.lua`: pinch zoom around the fingers, also while panning; the tutorial telling the native
+  interface what it points at.
+- `main.cpp`: runs the touch start-up before Lua.
+- `app.lua`, `config_finder.lua`: saving when the app goes into the background, resuming on
+  launch, and the iOS settings (resolution, bundled data, touch controls, music off without music
+  files).
+- `ui.lua`, `menu.lua`, `bottom_panel.lua`, `window.lua`, `edit_room.lua`: hooks that hand
+  menus, dialogs, the bottom panel and the room editor to the native interface.
+
+Everything touch- and iOS-specific is switched on only on iOS (or with `CORSIXTH_TOUCH_UI=1` on a
+desktop, for testing), so desktop CorsixTH behaves exactly as upstream.
 
 `tools/sdl2_uiscene_edit.py` also patches SDL2, because apps built with current iOS SDKs must use
 Apple's scene-based life cycle (UIScene), which SDL2 predates. The approach comes from SDL3: SDL's
@@ -221,7 +260,7 @@ The rules: our code goes in `src/` and `lua/`; changes to CorsixTH's own files a
 hooks in `patches/corsixth-ios.patch` (after editing `CorsixTH/`, regenerate it with
 `git -C CorsixTH diff > patches/corsixth-ios.patch`); touch and iOS behaviour stays behind touch
 mode, so desktop CorsixTH is unchanged; the game's own code does every check and charge; and no game
-data or CorsixTH source goes in git. [`PLAN.md`](PLAN.md) is the roadmap.
+data or CorsixTH source goes in git. [`ROADMAP.md`](ROADMAP.md) lists what's next.
 
 ```bash
 bash build-ios.sh --simulator             # build and run in the iOS Simulator

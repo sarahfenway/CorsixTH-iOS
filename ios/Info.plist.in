@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Theme Hospital</string>
+	<string>CorsixTH</string>
 	<key>CFBundleExecutable</key>
 	<string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
 	<key>CFBundleIdentifier</key>
@@ -73,7 +73,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<!-- Shows the app's iCloud Drive folder (save games, logs) in the Files
-	     app and Finder as "Theme Hospital". -->
+	     app and Finder as "CorsixTH". -->
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.${MACOSX_BUNDLE_GUI_IDENTIFIER}</key>
@@ -81,7 +81,7 @@
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerName</key>
-			<string>Theme Hospital</string>
+			<string>CorsixTH</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 		</dict>

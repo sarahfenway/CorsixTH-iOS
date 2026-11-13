@@ -1,0 +1,32 @@
+# Checks that need no Xcode or game data: the touch code's unit tests, and
+# that our Lua and the build script parse. The simulator tests need the
+# player's own game data, so they run locally (build-ios.sh --run).
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Touch gesture unit tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/test_touch_gestures.cpp src/touch_gestures.cpp -o tg
+          ./tg
+
+      - name: Save storage unit tests
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/test_touch_storage.cpp src/touch_storage.cpp -o ts
+          ./ts
+
+      - name: Lua parses
+        run: |
+          sudo apt-get install -y --no-install-recommends lua5.4
+          for f in lua/*.lua; do luac5.4 -p "$f"; done
+
+      - name: Build script parses
+        run: bash -n build-ios.sh
