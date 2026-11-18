@@ -332,8 +332,8 @@ final class NativeUI: NSObject, UIAdaptivePresentationControllerDelegate {
         NativeUI.post("text_input_cancel", ["id": id])
       })
     alert.addAction(
-      UIAlertAction(title: "OK", style: .default) { _ in
-        NativeUI.post("text_input", ["id": id, "text": alert.textFields?.first?.text ?? ""])
+      UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
+        NativeUI.post("text_input", ["id": id, "text": alert?.textFields?.first?.text ?? ""])
       })
     textAlert = alert
     topViewController()?.present(alert, animated: true)

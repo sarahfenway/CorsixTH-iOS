@@ -16,6 +16,7 @@ struct EditorButton: Decodable, Hashable {
   var symbol: String?
   var enabled: Bool
   var prominent: Bool
+  var label: String?  // VoiceOver and tests, when it differs from the title
 }
 
 struct EditorMarker: Decodable, Hashable {
@@ -92,7 +93,9 @@ final class EditorOverlay {
     let view = parent.view!
     container.frame = view.bounds
     container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    view.addSubview(container)
+    // Under the toolbar and its pills: a marker (a walking person's tag) must
+    // never take a tap meant for a toolbar button.
+    view.insertSubview(container, at: 0)
 
     // The tray, at the side.
     if #available(iOS 16.4, *) {
@@ -111,6 +114,8 @@ final class EditorOverlay {
     // The bar.
     bar.overrideUserInterfaceStyle = .dark
     bar.layer.cornerRadius = 26
+    // The bar is a fixed 52 points tall: its titles stop growing at this size.
+    bar.maximumContentSizeCategory = .extraExtraLarge
     bar.layer.cornerCurve = .continuous
     bar.clipsToBounds = true
     bar.translatesAutoresizingMaskIntoConstraints = false
@@ -191,7 +196,7 @@ final class EditorOverlay {
       }
       let b = UIButton(configuration: config)
       b.isEnabled = spec.enabled
-      b.accessibilityLabel = spec.title ?? (spec.id == "cancel" ? "Cancel" : spec.id)
+      b.accessibilityLabel = spec.label ?? spec.title ?? (spec.id == "cancel" ? "Cancel" : spec.id)
       let id = spec.id
       b.addAction(UIAction { _ in NativeUI.post("editor_button", ["id": id]) }, for: .touchUpInside)
       buttonRow.addArrangedSubview(b)

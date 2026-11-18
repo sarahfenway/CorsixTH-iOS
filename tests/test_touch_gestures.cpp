@@ -500,6 +500,26 @@ int main() {
     expect("edge: lifting the finger stops it (the cursor stays at the edge)", out, "");
   }
   {
+    // The game put the pointer on the top edge (someone picked up near the
+    // top); dragging sideways scrolls nothing: only pushing into an edge does.
+    auto g = trackpad();
+    std::vector<mouse_action> out;
+    g.warp_cursor(300, 0);
+    g.finger_down(1, 100, 200, 1000, out);
+    for (int i = 1; i <= 20; ++i) {
+      g.finger_move(1, 100 + 5 * i, 200, 1000 + 40 * i, out);
+      g.tick(1000 + 40 * i + 20, out);
+    }
+    g.finger_up(1, 200, 200, 1900, out);
+    std::string got = describe(out);
+    if (got.find("scroll") != std::string::npos) {
+      ++failures;
+      std::printf("FAIL edge: a sideways drag along the edge it was put on scrolls\n  got:  %s\n", got.c_str());
+    } else {
+      std::printf("ok   edge: a sideways drag along the edge it was put on doesn't scroll\n");
+    }
+  }
+  {
     auto g = trackpad();
     std::vector<mouse_action> out;
     to_right_edge(g, out);

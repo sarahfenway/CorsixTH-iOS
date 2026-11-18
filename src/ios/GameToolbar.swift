@@ -164,7 +164,9 @@ final class GameToolbar {
     adviserFace.layer.magnificationFilter = .nearest
     adviserText.font = .preferredFont(forTextStyle: .subheadline)
     adviserText.adjustsFontForContentSizeCategory = true
-    adviserText.numberOfLines = 0
+    // (Long speeches at big text sizes mustn't grow up over the status pill.)
+    adviserText.numberOfLines = 6
+    adviserText.lineBreakMode = .byTruncatingTail
     adviserMore.font = .preferredFont(forTextStyle: .caption1)
     adviserMore.textColor = .secondaryLabel
     let adviserWords = UIStackView(arrangedSubviews: [adviserText, adviserMore])
@@ -380,16 +382,17 @@ final class GameToolbar {
       button.accessibilityValue = fax.open ? "Open" : nil
       button.largeContentTitle = fax.title
       button.showsLargeContentViewer = true
-      let index = fax.index
+      // (The kind too: if one expires meanwhile, the list moves along.)
+      let which: [String: Any] = ["index": fax.index, "kind": fax.kind]
       button.addAction(
-        UIAction { _ in NativeUI.post("open_message", ["index": index]) }, for: .touchUpInside)
+        UIAction { _ in NativeUI.post("open_message", which) }, for: .touchUpInside)
       if fax.dismissable {
         button.menu = UIMenu(children: [
           UIAction(title: "Open", image: UIImage(systemName: "doc.text")) { _ in
-            NativeUI.post("open_message", ["index": index])
+            NativeUI.post("open_message", which)
           },
           UIAction(title: "Dismiss", image: UIImage(systemName: "xmark"), attributes: .destructive) { _ in
-            NativeUI.post("dismiss_message", ["index": index])
+            NativeUI.post("dismiss_message", which)
           },
         ])
       }

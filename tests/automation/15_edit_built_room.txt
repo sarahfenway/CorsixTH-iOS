@@ -24,9 +24,9 @@ wait_until 10000 TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(
 wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
 wait 500
 screenshot 1_editing
-# The bin asks first; Cancel keeps the room and the editor.
+# The bin (Delete Room) asks first; Cancel keeps the room and the editor.
 lua rawset(_G, "auto_money", TheApp.ui.hospital.balance); return auto_money
-native_tap Cancel
+native_tap Delete Room
 wait 1000
 screenshot 2_delete_question
 native_tap Cancel
@@ -59,7 +59,7 @@ tap_at (function() local r = rawget(_G, "auto_gp2"); local sx, sy = TheApp.ui:Wo
 wait_until 10000 TheApp.ui:getWindow(UIEditRoom) ~= nil and TheApp.ui:getWindow(UIEditRoom).phase == "objects"
 wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
 wait 500
-native_tap Cancel
+native_tap Delete Room
 wait 1000
 native_tap Delete Room
 wait_until 5000 TheApp.ui:getWindow(UIEditRoom) == nil

@@ -29,6 +29,11 @@ wait_until 3000 auto_tut() == "2.2"
 expect TheApp.native:state().hire.suggested == "Receptionist"
 wait 800
 screenshot 3_hire_panel
+# Hiring someone else doesn't count: the tutorial still wants a receptionist.
+lua local d = TheApp.native:state().hire.candidates.Doctor[1]; rawset(_G, "auto_other", d.name); return d.name
+lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_other") .. '"}')
+wait 1500
+expect auto_tut() == "2.2"
 lua local r = TheApp.native:state().hire.candidates.Receptionist[1]; rawset(_G, "auto_rec", r.name); return r.name
 lua require("sdl").native.post("hire", '{"category":"Receptionist","index":1,"name":"' .. rawget(_G, "auto_rec") .. '"}')
 wait_until 5000 auto_tut() == "3.1"

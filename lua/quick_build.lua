@@ -109,7 +109,7 @@ end
 --! Whether the engine accepts the outline and the player can build now.
 function QuickBuild:isValid()
   return self.edit.confirm_button.enabled and self.app.world.user_actions_allowed and
-      (self.app.world.free_build_mode or self.ui.hospital.balance >= self:cost())
+      (self.app.world.free_build_mode or self.edit.paid or self.ui.hospital.balance >= self:cost())
 end
 
 function QuickBuild:reason()
@@ -117,7 +117,8 @@ function QuickBuild:reason()
     return "Paused"
   elseif not self.edit.confirm_button.enabled then
     return "Can't build here"
-  elseif not self.app.world.free_build_mode and self.ui.hospital.balance < self:cost() then
+  elseif not self.app.world.free_build_mode and not self.edit.paid and
+      self.ui.hospital.balance < self:cost() then
     return "Not enough money"
   end
   return ""
@@ -126,7 +127,7 @@ end
 --! Sends the overlay (handle positions in game pixels, labels) to the native
 -- side when anything it shows has changed.
 function QuickBuild:sendOverlay(force)
-  if self.building then
+  if self.building and not self.waiting_for_objects then
     return
   end
   local ui, rect = self.ui, self.rect
@@ -138,8 +139,9 @@ function QuickBuild:sendOverlay(force)
   local state = {
     name = json.text(self.room_type.name),
     cost = self.edit.paid and "Move" or self.native.formatMoney(self:cost()),
-    valid = self:isValid() and true or false,
-    reason = self:reason(),
+    -- (While people walk out of the area, only Cancel does anything.)
+    valid = not self.building and self:isValid() and true or false,
+    reason = self.waiting_for_objects and "Waiting for people to leave…" or self:reason(),
     logical = { self.app.config.width, self.app.config.height },
     -- Corners of the outline on screen: top, right, bottom, left.
     corners = {
@@ -207,6 +209,17 @@ function QuickBuild:byHand(message)
   local native = self.native
   native.pending_adoptions = native.pending_adoptions or {}
   table.insert(native.pending_adoptions, self.edit)
+end
+
+--! Cancel while people are still walking out of the area: back to the
+-- outline, as the game's Back from that stage does.
+function QuickBuild:stopWaiting()
+  if self.edit.phase == "clear_area" then
+    self.edit:cancel()
+  end
+  self.waiting_for_objects = false
+  self.building = false
+  self:sendOverlay(true)
 end
 
 function QuickBuild:cancel()
@@ -319,15 +332,39 @@ function QuickBuild.placeRemaining(edit, rect, door)
     edit.place_objects = true
     edit:setActiveIndex(best.index)
     local score = scores[best.object.id] or against_wall(rect)
-    table.sort(tiles, function(a, b) return score(a.x, a.y) > score(b.x, b.y) end)
+    -- Where it may go, and facing which ways. Items fixed to a wall only go
+    -- along the north or west wall, facing as that wall says, as the game
+    -- puts them (UIPlaceObjects:calculateBestPlacementPosition).
+    local spots = {}
+    local locked = best.object.locked_to_wall
+    if locked then
+      for _, tile in ipairs(tiles) do
+        if locked.north and tile.y == rect.y then
+          spots[#spots + 1] = { x = tile.x, y = tile.y, orientations = { locked.north } }
+        end
+        if locked.west and tile.x == rect.x then
+          spots[#spots + 1] = { x = tile.x, y = tile.y, orientations = { locked.west } }
+        end
+      end
+    else
+      for _, tile in ipairs(tiles) do
+        spots[#spots + 1] = { x = tile.x, y = tile.y,
+          orientations = { "north", "east", "south", "west" } }
+      end
+    end
+    table.sort(spots, function(a, b)
+      local sa, sb = score(a.x, a.y), score(b.x, b.y)
+      if sa ~= sb then return sa > sb end
+      return a.y < b.y or (a.y == b.y and a.x < b.x) -- (the same every time)
+    end)
     local placed = false
-    for _, tile in ipairs(tiles) do
-      for _, orientation in ipairs({ "north", "east", "south", "west" }) do
+    for _, spot in ipairs(spots) do
+      for _, orientation in ipairs(spot.orientations) do
         if best.object.orientations[orientation] then
           edit:setOrientation(orientation)
-          edit:setBlueprintCell(tile.x, tile.y)
+          edit:setBlueprintCell(spot.x, spot.y)
           if edit.object_blueprint_good and
-              not world:anyHumanoidObscuringArea(tile.x, tile.y) then
+              not world:anyHumanoidObscuringArea(spot.x, spot.y) then
             edit:placeObject()
             placed = true
             break
@@ -356,9 +393,12 @@ function QuickBuild:onTick()
   end
   if self.waiting_for_objects then
     if self.edit.phase ~= "objects" then
-      return false -- Still waiting for people to leave the area.
+      -- Still waiting for people to leave the area: say so, with Cancel.
+      self:sendOverlay(false)
+      return false
     end
     self.waiting_for_objects = false
+    SDL.native.setQuickBuild(nil) -- (The waiting bar, if it was shown.)
     if QuickBuild.placeRemaining(self.edit, self.rect, self.door) and
         self.edit.confirm_button.enabled then
       self.edit:confirm(true) -- Pays and opens the room, as clicking the tick does.

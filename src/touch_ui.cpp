@@ -100,6 +100,7 @@ int logical_w = 0;
 int logical_h = 0;
 int cursor_x = 0;
 int cursor_y = 0;
+bool cursor_known = false;  // cursor_x/y are where the game's pointer is
 uint32_t buttons_held = 0;
 
 bool finger_to_logical(const SDL_TouchFingerEvent& f, int* x, int* y) {
@@ -225,9 +226,25 @@ void flush_actions() {
     }
     cursor_x = a.x;
     cursor_y = a.y;
+    cursor_known = true;
     SDL_PushEvent(&ev);
   }
   actions.clear();
+}
+
+// Switches between the trackpad and direct recognisers. The trackpad carries
+// on from where the pointer is (direct taps will have moved it).
+void apply_controls(bool want_trackpad) {
+  if (want_trackpad == trackpad_mode) {
+    return;
+  }
+  direct.cancel(actions);
+  trackpad.cancel(actions);
+  flush_actions();
+  trackpad_mode = want_trackpad;
+  if (trackpad_mode && cursor_known) {
+    trackpad.warp_cursor(cursor_x, cursor_y);
+  }
 }
 
 }  // namespace
@@ -385,6 +402,16 @@ bool resolution_for_window(int window_w, int window_h, int* width, int* height) 
   screen_h = window_h;
   logical_size(window_w, window_h, 640, env_int("CORSIXTH_TOUCH_MIN_HEIGHT", 480), width,
                height);
+  // The trackpad's area follows now, not on the next touch (the game may move
+  // the pointer first); if the pointer is now off screen, it comes back on.
+  logical_w = *width;
+  logical_h = *height;
+  trackpad.set_bounds(*width, *height);
+  if (trackpad_mode && cursor_known &&
+      (trackpad.cursor_x() != cursor_x || trackpad.cursor_y() != cursor_y)) {
+    actions.push_back({mouse_action::kind::move, 0, trackpad.cursor_x(), trackpad.cursor_y()});
+    flush_actions();
+  }
   std::printf("Touch UI: screen now %dx%d, game resolution %dx%d\n", window_w, window_h,
               *width, *height);
   return true;
@@ -428,6 +455,18 @@ bool handle_event(const SDL_Event& e) {
       int x = 0;
       int y = 0;
       if (!finger_to_logical(f, &x, &y)) {
+        // (No window to map it to.) A lifted finger still counts as lifted,
+        // or routing would think it's down for ever.
+        if (e.type == SDL_FINGERUP) {
+          fingers_down.erase(std::remove(fingers_down.begin(), fingers_down.end(), f.fingerId),
+                             fingers_down.end());
+          if (fingers_down.empty()) {
+            direct.cancel(actions);
+            trackpad.cancel(actions);
+            gesture_direct = false;
+            flush_actions();
+          }
+        }
         return true;
       }
       uint32_t now = SDL_GetTicks();
@@ -484,10 +523,16 @@ void poll() {
   if (!enabled()) {
     return;
   }
+  // Touches still waiting in the queue (the game was busy, say saving):
+  // they come first, or a quick tap held across the wait would count as a
+  // long press.
+  if (SDL_PeepEvents(nullptr, 0, SDL_PEEKEVENT, SDL_FINGERDOWN, SDL_FINGERMOTION) > 0) {
+    return;
+  }
   if (!trackpad_mode || gesture_direct) {
     direct.tick(SDL_GetTicks(), actions);  // long press
   } else {
-    trackpad.tick(SDL_GetTicks(), actions);  // long press while placing
+    trackpad.tick(SDL_GetTicks(), actions);  // long press while placing, edge scrolling
   }
   flush_actions();
 }
@@ -504,9 +549,9 @@ void set_placement_mode(placement_touch mode) {
                             : mode == placement_touch::carry ? trackpad_recogniser::pointer::carry
                                                              : trackpad_recogniser::pointer::none);
   if (mode == placement_touch::off) {
-    set_controls(trackpad_before_placement ? "trackpad" : "direct");
+    apply_controls(trackpad_before_placement);
   } else {
-    set_controls(mode == placement_touch::pick ? "direct" : "trackpad");
+    apply_controls(mode != placement_touch::pick);
   }
 }
 
@@ -517,8 +562,20 @@ void move_pointer(int x, int y) {
     return;
   }
   trackpad.warp_cursor(x, y);
-  actions.push_back({mouse_action::kind::move, 0, trackpad.cursor_x(), trackpad.cursor_y()});
   flush_actions();
+  // Always sent, even if it's where touch_ui last put the pointer: the
+  // game's own cursor may have moved since (loading a game resets it).
+  SDL_Event ev{};
+  ev.type = SDL_MOUSEMOTION;
+  ev.motion.timestamp = SDL_GetTicks();
+  ev.motion.state = buttons_held;
+  ev.motion.x = trackpad.cursor_x();
+  ev.motion.y = trackpad.cursor_y();
+  ev.motion.xrel = ev.motion.x - cursor_x;
+  ev.motion.yrel = ev.motion.y - cursor_y;
+  cursor_x = ev.motion.x;
+  cursor_y = ev.motion.y;
+  SDL_PushEvent(&ev);
 }
 
 void set_direct_regions(std::vector<region> regions) {
@@ -531,12 +588,12 @@ void set_cursor_speed(double speed) {
 
 void set_controls(const char* name) {
   bool want_trackpad = name == nullptr || std::strcmp(name, "direct") != 0;
-  if (want_trackpad != trackpad_mode) {
-    direct.cancel(actions);
-    trackpad.cancel(actions);
-    flush_actions();
-    trackpad_mode = want_trackpad;
+  if (placing != placement_touch::off) {
+    // The player changed it mid-edit: it applies once the editor is done.
+    trackpad_before_placement = want_trackpad;
+    return;
   }
+  apply_controls(want_trackpad);
 }
 
 }  // namespace touch_ui

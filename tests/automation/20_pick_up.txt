@@ -55,6 +55,17 @@ native_tap Done
 wait_until 3000 TheApp.native.editor == nil
 wait 500
 expect not require("sdl").native.tap("Done")
+# Not while another editor's open (picking someone up would close it,
+# without cancelling it): furnishing a corridor, say.
+native_tap Furnish Corridor
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.ui:getWindow(UIFurnishCorridor) ~= nil
+native_tap Pick Up
+wait 800
+expect TheApp.ui:getWindow(UIFurnishCorridor) ~= nil
+expect getmetatable(TheApp.native.editor) ~= corsixth.require("ios.pick_up")
+native_tap OK
+native_tap Cancel
+wait_until 3000 TheApp.native.editor == nil and TheApp.ui:getWindow(UIFurnishCorridor) == nil
 # Picked up another way (a right click): carried the same way; Put Back.
 lua rawget(_G, "auto_doc"):onClick(TheApp.ui, "right")
 wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer ~= nil

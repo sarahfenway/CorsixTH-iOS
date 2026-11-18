@@ -45,6 +45,25 @@ end
 local PickUp = {}
 PickUp.__index = PickUp
 
+--! Why people can't be picked up now, or nil. As the game: clicking people
+-- is off while one of its editors is open (picking someone up would close
+-- it, without cancelling it) or a room is being chosen to edit, and in
+-- vaccination mode only infected patients can be clicked.
+function PickUp.blocked(native)
+  local ui = native.app.ui
+  if not ui or not native.app.world then
+    return "No game is running."
+  elseif native.quick_build or ui:getWindow(UIPlaceObjects) or ui:getWindow(UIFurnishCorridor) or
+      ui.edit_room or ui.do_world_hit_test ~= true then
+    return "Finish building first."
+  end
+  local epidemic = ui.hospital and ui.hospital.epidemic
+  if epidemic and epidemic.vaccination_mode_active then
+    return "Not while vaccinating."
+  end
+  return nil
+end
+
 --! Pick Up mode, from the toolbar: tags on the people on screen. It ends once
 -- someone's been dropped (or put back), or with Done.
 function PickUp.start(native)
@@ -171,6 +190,11 @@ function PickUp:marker(id)
   if self.placer or not staff or staff.fired or staff.pickup then return end
   if not self.app.world.user_actions_allowed then
     self.native:message("The game is paused.")
+    return
+  end
+  local why = PickUp.blocked(self.native)
+  if why then
+    self.native:message(why)
     return
   end
   -- As right-clicking them: the game picks them up (a UIPlaceStaff opens,

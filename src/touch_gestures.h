@@ -248,6 +248,8 @@ class trackpad_recogniser {
   bool cursor_announced{false};
   bool pointer_mode{false};  // place or carry
   bool pointer_long_press{false};  // place: a long press right-clicks
+  int push_x{0};  // Which way the finger last moved (-1, 0, 1), for edge scrolling.
+  int push_y{0};
   uint32_t edge_since{0};  // When the cursor was first pushed against an edge.
   uint32_t edge_last{0};
   double edge_x{0};  // Scrolling not yet sent (less than a pixel).

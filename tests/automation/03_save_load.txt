@@ -53,6 +53,20 @@ screenshot 5_text_input
 lua require("sdl").native.post("text_input", '{"id":' .. (TheApp.native.next_text_id - 1) .. ',"text":"Hi there"}'); require("sdl").native.dismiss()
 wait 500
 expect rawget(_G, "auto_text") == "Hi there"
+# A name ending in a full stop (two spaces on the iOS keyboard) can still be
+# loaded and deleted; "Resume" is kept for the app's own save.
+lua TheApp.native:show("save")
+wait 500
+lua require("sdl").native.post("save", '{"name":"Dot test."}')
+wait_until 5000 lfs.attributes(TheApp.savegame_dir .. "Dot test.sav", "size") ~= nil
+lua require("sdl").native.post("delete_save", '{"path":"' .. TheApp.savegame_dir .. 'Dot test.sav"}')
+wait_until 3000 lfs.attributes(TheApp.savegame_dir .. "Dot test.sav", "size") == nil
+lua rawset(_G, "auto_resume", lfs.attributes(TheApp.savegame_dir .. "Resume.sav", "modification")); TheApp.native:show("save")
+wait 500
+lua require("sdl").native.post("save", '{"name":"Resume"}')
+wait 1000
+expect lfs.attributes(TheApp.savegame_dir .. "Resume.sav", "modification") == rawget(_G, "auto_resume")
+lua require("sdl").native.dismiss(); TheApp.native:resumeGame()
 # Quit to the main menu.
 lua require("sdl").native.post("quit_to_menu")
 wait_until 5000 require("sdl").native.screen() == "main_menu"

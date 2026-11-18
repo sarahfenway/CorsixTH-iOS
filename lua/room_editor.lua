@@ -62,18 +62,27 @@ end
 -- item being placed fits, unless it fits where it is. rect is the room's
 -- outline ({x, y, w, h}); without one (corridors), tiles near the ghost.
 local function aim(window, rect)
+  if window.closed then
+    return -- (Everything's placed. Its blueprint cell would leave a marker.)
+  end
   local entry = window.place_objects ~= false and window.objects[window.active_index or 0]
   if not entry or entry.object.locked_to_wall then
     return -- (The game keeps wall items on the wall itself.)
   end
-  local ui = window.ui
-  local cx, cy = window.object_cell_x, window.object_cell_y
-  if not cx then
-    local wx, wy = ui:ScreenToWorld(ui.cursor_x or 0, ui.cursor_y or 0)
-    cx, cy = math.floor(wx), math.floor(wy)
+  local ui, config = window.ui, TheApp.config
+  -- Only somewhere the player can see (and the pointer can go).
+  local function on_screen(x, y)
+    local sx, sy = ui:WorldToScreen(x + 0.5, y + 0.5)
+    return sx >= 12 and sy >= 12 and sx < config.width - 12 and sy < config.height - 12
   end
-  if window.object_cell_x and fits(window, cx, cy) then
+  local cx, cy = window.object_cell_x, window.object_cell_y
+  if window.object_cell_x and on_screen(cx, cy) and fits(window, cx, cy) then
     return
+  end
+  if not cx or not on_screen(cx, cy) then
+    -- Search from the middle of the screen instead.
+    local wx, wy = ui:ScreenToWorld(config.width / 2, config.height / 2)
+    cx, cy = math.floor(wx), math.floor(wy)
   end
   local tiles = {}
   local map = TheApp.world.map
@@ -81,11 +90,13 @@ local function aim(window, rect)
   if rect then
     x1, y1, x2, y2 = rect.x, rect.y, rect.x + rect.w - 1, rect.y + rect.h - 1
   else
-    x1, y1, x2, y2 = cx - 8, cy - 8, cx + 8, cy + 8
+    x1, y1, x2, y2 = cx - 10, cy - 10, cx + 10, cy + 10
   end
   for y = math.max(1, y1), math.min(map.height, y2) do
     for x = math.max(1, x1), math.min(map.width, x2) do
-      tiles[#tiles + 1] = { x = x, y = y, d = (x - cx) ^ 2 + (y - cy) ^ 2 }
+      if on_screen(x, y) then
+        tiles[#tiles + 1] = { x = x, y = y, d = (x - cx) ^ 2 + (y - cy) ^ 2 }
+      end
     end
   end
   table.sort(tiles, function(a, b)
@@ -134,16 +145,21 @@ end
 -- refunds part of the cost, as there).
 local function delete_room(native, edit)
   native.confirm_next = true
-  for _ = 1, 6 do
-    if edit.closed then break end
-    edit:cancel()
+  local ok, err = pcall(function()
+    for _ = 1, 6 do
+      if edit.closed then break end
+      edit:cancel()
+    end
+  end)
+  native.confirm_next = false -- (Always: no later dialog is answered for the player.)
+  if not ok then
+    print("Native UI: couldn't delete the room: " .. tostring(err))
   end
-  native.confirm_next = false
 end
 
-local function button(id, title, symbol, enabled, prominent)
+local function button(id, title, symbol, enabled, prominent, label)
   return { id = id, title = title, symbol = symbol, enabled = enabled ~= false,
-    prominent = prominent or false }
+    prominent = prominent or false, label = label }
 end
 
 -- Rows for the tray's "to place" list from a UIPlaceObjects' list.
@@ -203,7 +219,8 @@ end
 --! Placing items: touches move the pointer ("place"); other stages tap
 -- directly. On reaching the objects stage the first item goes where it fits.
 function RoomEditor:updateTouch()
-  local placing = self.edit.phase == "objects" and not self.buying
+  local phase = self.edit.phase
+  local placing = phase == "objects" and not self.buying
   if placing ~= self.placing then
     self.placing = placing
     SDL.native.setPlacementTouch(placing and "place" or true)
@@ -211,6 +228,29 @@ function RoomEditor:updateTouch()
       aim(self.edit, self.edit.blueprint_rect)
     end
   end
+  if phase ~= self.touch_phase then
+    self.touch_phase = phase
+    if phase == "door" or phase == "windows" then
+      self:parkPointer()
+    end
+  end
+end
+
+--! In the door and windows stages the game puts its door or window wherever
+-- its pointer is near the outline, every tick, over what a marker chose.
+-- So the pointer waits in the screen's corner furthest from the room.
+function RoomEditor:parkPointer()
+  local r, ui, config = self.edit.blueprint_rect, self.ui, self.app.config
+  local cx, cy = ui:WorldToScreen(r.x + r.w / 2, r.y + r.h / 2)
+  local best, best_d
+  for _, corner in ipairs({ { 4, 4 }, { config.width - 5, 4 }, { 4, config.height - 5 },
+      { config.width - 5, config.height - 5 } }) do
+    local d = (corner[1] - cx) ^ 2 + (corner[2] - cy) ^ 2
+    if not best_d or d > best_d then
+      best, best_d = corner, d
+    end
+  end
+  SDL.native.movePointer(best[1], best[2])
 end
 
 --! Wall segments of the outline where a door or window could go: every
@@ -360,8 +400,9 @@ function RoomEditor:sendState(force)
     state.buttons[#state.buttons + 1] =
         button("done", "Done", "checkmark", edit.confirm_button.enabled, left == 0)
   end
-  -- Cancel is always there (first).
-  table.insert(state.buttons, 1, button("cancel", nil, "trash"))
+  -- Cancel is always there (first): abandons a new room, deletes a built one.
+  table.insert(state.buttons, 1,
+      button("cancel", nil, "trash", true, false, edit.paid and "Delete Room" or "Cancel Room"))
   local text = json.encode(state)
   if force or text ~= self.state_json then
     self.state_json = text
@@ -443,6 +484,7 @@ function RoomEditor:marker(id)
     end
     self.window_options = nil -- Ask the game again.
   end
+  self:parkPointer() -- (A tap on the map may have brought it near the room.)
   self:sendState(true)
 end
 
@@ -668,8 +710,10 @@ end
 function Furnisher:pressed(id)
   local window = self.window
   if id == "cancel" or (id == "done" and self.placing) then
-    -- Closing the game's window: unplaced purchases are refunded, as there.
-    window:close()
+    -- Closing the game's window: unplaced purchases are refunded, as there,
+    -- and anything picked up to move goes back where it was (the game's
+    -- Escape; its plain close would sell it).
+    window:close(self.placing or nil)
     self:finish()
     return
   end

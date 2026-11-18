@@ -78,9 +78,9 @@ void set_controls(const char* name);
 //! Touch controls for the native editors, whatever the player's own setting:
 //!  - pick: direct, a tap clicks where it lands (choosing a room or a wall).
 //!  - place: placing an item. A drag moves the pointer (and the item's ghost)
-//!    like the trackpad, so the finger never hides it; a tap moves it to the
-//!    finger; a long press right-clicks there (picks a placed item up).
-//!    Nothing is placed by touch: the editor's Place button does that.
+//!    1:1 like the trackpad, so the finger never hides it; a tap anywhere
+//!    places it where it is (a left click at the pointer); a long press
+//!    right-clicks under the finger (picks a placed item up).
 //!  - carry: carrying a person who's been picked up. A drag moves them the
 //!    same way; a tap anywhere drops them where they are (a left click).
 //! off restores the player's own controls.

@@ -25,8 +25,11 @@ struct NativeRootView: View {
         PanelOrSheet(title: "Build Room") { RoomCatalogView() }
       case "hire_staff":
         PanelOrSheet(title: "Hire Staff") { HireStaffView() }
-      default:
+      case "game_menu":
         GameMenuView()
+      default:
+        // (Closing: the screen is cleared before the animation ends.)
+        Color.clear
       }
     }
     .id(model.navigationID)

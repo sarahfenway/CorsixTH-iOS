@@ -135,6 +135,9 @@ wait_until 30000 TheApp.native.quick_build == nil
 wait 300
 lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "operating_theatre" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "operating_theatre", ok and "" or why); return results[#results]
 screenshot operating_theatre
+lua local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "operating_theatre" then room = r end end; local bad = {}; for o in pairs(room and room.objects or {}) do local lw = o.object_type.locked_to_wall; if lw and not ((lw.north and o.tile_y == room.y and o.direction == lw.north) or (lw.west and o.tile_x == room.x and o.direction == lw.west)) then bad[#bad + 1] = o.object_type.id .. "@" .. o.tile_x .. "," .. o.tile_y .. " " .. o.direction end end; rawset(_G, "auto_wall_bad", #bad); return #bad == 0 and "wall items on their walls" or table.concat(bad, " ")
+# (Items fixed to a wall are on the north or west wall, facing as the game puts them.)
+expect rawget(_G, "auto_wall_bad") == 0
 log ---- pharmacy
 lua TheApp:loadLevel(12, "full")
 wait_until 30000 TheApp.world ~= nil and TheApp.ui:getWindow(UIInformation) ~= nil
@@ -256,5 +259,8 @@ wait_until 30000 TheApp.native.quick_build == nil
 wait 300
 lua local results = rawget(_G, "auto_results"); local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "x_ray" then room = r end end; local ok, why = false, rawget(_G, "auto_rect"); if room then local have = {}; for o in pairs(room.objects) do have[o.object_type.id] = (have[o.object_type.id] or 0) + 1 end; ok = room.built; for obj, n in pairs(room.room_info.objects_needed) do if (have[obj] or 0) < n then ok = false; why = why .. " missing " .. obj end end; if not room.built then why = why .. " not finished" end elseif not why:find("no proposal") then why = why .. " no room" end; results[#results + 1] = ("%s %s %s"):format(ok and "OK  " or "FAIL", "x_ray", ok and "" or why); return results[#results]
 screenshot x_ray
+lua local room; for _, r in pairs(TheApp.world.rooms) do if r.room_info.id == "x_ray" then room = r end end; local bad = {}; for o in pairs(room and room.objects or {}) do local lw = o.object_type.locked_to_wall; if lw and not ((lw.north and o.tile_y == room.y and o.direction == lw.north) or (lw.west and o.tile_x == room.x and o.direction == lw.west)) then bad[#bad + 1] = o.object_type.id .. "@" .. o.tile_x .. "," .. o.tile_y .. " " .. o.direction end end; rawset(_G, "auto_wall_bad", #bad); return #bad == 0 and "wall items on their walls" or table.concat(bad, " ")
+# (Items fixed to a wall are on the north or west wall, facing as the game puts them.)
+expect rawget(_G, "auto_wall_bad") == 0
 lua local bad = 0; for _, line in ipairs(rawget(_G, "auto_results")) do print(line); if line:sub(1, 4) == "FAIL" then bad = bad + 1 end end; rawset(_G, "auto_bad", bad); return bad .. " of " .. #rawget(_G, "auto_results") .. " failed"
 expect rawget(_G, "auto_bad") == 0

@@ -1,0 +1,70 @@
+# Games saved in the middle of something (the app saves whenever it goes into
+# the background) carry on natively when loaded: the game's windows come back
+# from the save, not through UI:addWindow, so the native controls take them
+# over again. And the pointer goes back to the person being carried (loading
+# resets the game's cursor to the corner, where they can't be dropped).
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+# 1) Mid-build: Customise, at the furniture stage.
+lua require("sdl").native.post("pick_room", '{"id":"gp"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 500
+native_tap Customise
+wait_until 3000 TheApp.native.editor ~= nil
+native_tap Next
+wait_until 3000 TheApp.ui:getWindow(UIEditRoom).phase == "windows"
+native_tap Next
+wait_until 10000 TheApp.ui:getWindow(UIEditRoom).phase == "objects"
+wait 500
+lua TheApp:save(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait 300
+lua TheApp:load(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait_until 20000 TheApp.world ~= nil and TheApp.ui.hospital ~= nil and TheApp.ui:getWindow(UIEditRoom) ~= nil
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.edit == TheApp.ui:getWindow(UIEditRoom)
+expect TheApp.ui:getWindow(UIEditRoom).x <= -1000
+wait 500
+screenshot 1_build_resumed
+native_tap Auto
+wait 300
+native_tap Done
+wait_until 5000 TheApp.ui:getWindow(UIEditRoom) == nil
+# 2) Mid-Quick Build: the outline's handles come back.
+lua TheApp.native:show("room_catalog")
+wait 500
+lua require("sdl").native.post("pick_room", '{"id":"psych"}')
+wait_until 3000 TheApp.native.quick_build ~= nil
+wait 500
+lua TheApp:save(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait 300
+lua TheApp:load(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait_until 20000 TheApp.world ~= nil and TheApp.ui.hospital ~= nil and TheApp.ui:getWindow(UIEditRoom) ~= nil
+wait_until 3000 TheApp.native.quick_build ~= nil
+expect TheApp.ui:getWindow(UIEditRoom).visible == false
+native_tap Cancel
+wait_until 3000 TheApp.ui:getWindow(UIEditRoom) == nil
+# 3) Carrying someone: a tap still drops them where they were picked up.
+native_tap Hire Staff
+wait_until 3000 require("sdl").native.screen() == "hire_staff"
+lua local d = TheApp.world.available_staff.Doctor[1]; rawset(_G, "auto_name", corsixth.require("ios.json").text(d:getFullName())); return auto_name
+lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_name") .. '"}')
+wait_until 3000 #TheApp.ui.hospital.staff == 1
+lua TheApp.native:close()
+wait 1500
+lua TheApp.ui.hospital.staff[1]:onClick(TheApp.ui, "right")
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer ~= nil
+lua TheApp:save(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait 300
+lua TheApp:load(TheApp.savegame_dir .. "AutoMidAction.sav")
+wait_until 20000 TheApp.world ~= nil and TheApp.ui.hospital ~= nil and TheApp.ui:getWindow(UIPlaceStaff) ~= nil
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer ~= nil
+wait 500
+expect TheApp.ui.hospital.staff[1].pickup
+expect TheApp.ui:getWindow(UIPlaceStaff):_isValidStaffPlacement()
+tap 120 380
+wait_until 3000 TheApp.ui:getWindow(UIPlaceStaff) == nil
+expect not TheApp.ui.hospital.staff[1].pickup
+expect TheApp.native.editor == nil
+lua os.remove(TheApp.savegame_dir .. "AutoMidAction.sav")

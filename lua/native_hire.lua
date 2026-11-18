@@ -135,9 +135,13 @@ function actions.hire(self, p)
     return
   end
   -- As UIHireStaff:hire. (The native panel has no tab or next/previous steps
-  -- for the tutorial to wait for, so it moves on from any of them.)
-  ui:tutorialStep(2, { 2, 3, 4, 5 }, 6)
-  ui:tutorialStep(4, { 2, 3 }, 4)
+  -- for the tutorial to wait for, so it moves on from any of them, but only
+  -- for the person it asked for, as the game's tabs would.)
+  if p.category == "Receptionist" then
+    ui:tutorialStep(2, { 2, 3, 4, 5 }, 6)
+  elseif p.category == "Doctor" then
+    ui:tutorialStep(4, { 2, 3 }, 4)
+  end
   if ui.hospital.balance < profile.wage then
     UIHireStaff.cannotAfford({ world = world })
     ui:playSound("wrong2.wav")

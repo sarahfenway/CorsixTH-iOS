@@ -361,8 +361,10 @@ void trackpad_recogniser::edge_scroll(uint32_t now, std::vector<mouse_action>& o
   int ey = 0;
   if ((st == state::tracking || st == state::dragging) && fingers.size() == 1 &&
       bounds_w > 0 && bounds_h > 0) {
-    ex = cursor_x() <= 0 ? -1 : cursor_x() >= bounds_w - 1 ? 1 : 0;
-    ey = cursor_y() <= 0 ? -1 : cursor_y() >= bounds_h - 1 ? 1 : 0;
+    // Against an edge, and the finger pushing (or last pushed) into it: the
+    // game may have put the pointer on an edge itself.
+    ex = cursor_x() <= 0 && push_x < 0 ? -1 : cursor_x() >= bounds_w - 1 && push_x > 0 ? 1 : 0;
+    ey = cursor_y() <= 0 && push_y < 0 ? -1 : cursor_y() >= bounds_h - 1 && push_y > 0 ? 1 : 0;
   }
   if (ex == 0 && ey == 0) {
     edge_since = 0;
@@ -480,6 +482,8 @@ void trackpad_recogniser::finger_down(int64_t finger, int x, int y,
     primary = finger;
     down_time = now;
     last_move_time = now;
+    push_x = 0;
+    push_y = 0;
     // A touch that follows a tap closely turns into a drag if it moves.
     drag_armed = !pointer_mode && last_was_tap && now - last_tap_time <= cfg.double_tap_ms;
     last_was_tap = false;
@@ -548,6 +552,9 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
   if (finger != primary) {
     return;
   }
+  // Which way it's going: only pushing into an edge scrolls (edge_scroll).
+  if (x != prev_x) push_x = x > prev_x ? 1 : -1;
+  if (y != prev_y) push_y = y > prev_y ? 1 : -1;
   if (st == state::pending) {
     if (!moved_far(f->start_x, f->start_y, x, y)) {
       return;  // Not moved enough yet; a tap may still be coming.
@@ -573,7 +580,9 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
     // finger's movement says.
     double dx = x - prev_x;
     double dy = y - prev_y;
-    double dt = std::max<double>(1.0, now - last_move_time);
+    // (At least one 120 Hz frame: moves that arrive together, after a busy
+    // moment, aren't a flick.)
+    double dt = std::max<double>(8.0, now - last_move_time);
     double velocity = std::sqrt(dx * dx + dy * dy) / dt;  // pixels per ms
     double gain = pointer_mode ? 1.0 : 1.0 + std::clamp((velocity - 0.25) * 0.8, 0.0, 1.5);
     last_move_time = now;

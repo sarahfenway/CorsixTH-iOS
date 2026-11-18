@@ -128,7 +128,7 @@ function NativeUI:toolbarState()
   end
   return {
     icons = icons,
-    highlight = self.tutorial_tool,
+    highlight = ui.tutorial and self.tutorial_tool or nil, -- (Not after it's over.)
     money = self.formatMoney(hospital.balance),
     date = _S.date_format.daymonth:format(date:dayOfMonth(), date:monthOfYear()),
     reputation = (hospital.reputation or 500) / 1000,
@@ -223,29 +223,45 @@ local tools = {
 function actions.tool(self, p)
   local ui = self.app.ui
   local panel = ui and ui.bottom_panel
+  -- The Build Room and Hire Staff panels leave the game running; another
+  -- tool closes them (as the player closing them would), or they'd sit on
+  -- top of its controls.
+  local screen = SDL.native.screen()
+  if panel and (screen == "room_catalog" or screen == "hire_staff") and
+      p.id ~= ({ room_catalog = "build", hire_staff = "hire" })[screen] then
+    SDL.native.dismiss()
+    self:screenClosed()
+  end
   if p.id == "pickup" and panel then
-    -- Pick Up mode (lua/pick_up.lua); the button again ends it.
-    local picking = self.editor and getmetatable(self.editor) == PickUp
+    -- Pick Up mode (lua/pick_up.lua); the button again ends it. Not over
+    -- another editor: its game window would stay open underneath.
+    if self.editor and getmetatable(self.editor) == PickUp then
+      self.editor:finish()
+      self.editor = nil
+      return
+    end
+    local why = PickUp.blocked(self)
+    if why then
+      self:message(why)
+      return
+    end
     if self.editor then
       self.editor:finish()
       self.editor = nil
     end
-    if not picking then
-      self.editor = PickUp.start(self)
-    end
+    self.editor = PickUp.start(self)
     return
   end
   if panel and tools[p.id] then
     tools[p.id](panel)
-    if p.id == "edit" then
+    if p.id == "edit" and ui.edit_room == true then
       -- The game is now waiting for a room to be clicked: touch picks it.
+      -- (It refuses while one of its windows is open; then nothing changes.)
       if self.editor then
         self.editor:finish()
         self.editor = nil
       end
-      if ui.edit_room == true then
-        self.editor = editing.RoomPicker.start(self)
-      end
+      self.editor = editing.RoomPicker.start(self)
     end
   end
 end
@@ -259,9 +275,26 @@ function actions.toolbar_speed(self, p)
 end
 
 --! Opens (or closes, if open) a fax, as clicking its icon does.
+--! The fax the player tapped: at that place in the bottom panel's list, if
+-- it's still the same kind (one expiring moves the rest along), else the
+-- one of that kind (there's at most one of each).
+local function tapped_fax(native, p)
+  local panel = native.app.ui and native.app.ui.bottom_panel
+  if not panel then return nil end
+  local icon = panel.message_windows[tonumber(p.index) or 1]
+  if icon and (not p.kind or icon.type == p.kind) then
+    return icon
+  end
+  for _, other in ipairs(panel.message_windows) do
+    if other.type == p.kind then
+      return other
+    end
+  end
+  return nil
+end
+
 function actions.open_message(self, p)
-  local panel = self.app.ui and self.app.ui.bottom_panel
-  local icon = panel and panel.message_windows[p.index or 1]
+  local icon = tapped_fax(self, p)
   if icon then
     icon:openMessage()
     self:updateToolbar(true)
@@ -295,8 +328,7 @@ end
 
 --! Dismisses a fax, as right-clicking its icon does (when the game allows).
 function actions.dismiss_message(self, p)
-  local panel = self.app.ui and self.app.ui.bottom_panel
-  local icon = panel and panel.message_windows[p.index or 1]
+  local icon = tapped_fax(self, p)
   if icon then
     icon:dismissMessage()
     self:updateToolbar(true)

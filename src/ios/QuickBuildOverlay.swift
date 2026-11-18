@@ -47,7 +47,8 @@ final class QuickBuildOverlay {
     }
     container.frame = view.bounds
     container.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    view.addSubview(container)
+    // Under the toolbar: a handle near the top mustn't take its taps.
+    view.insertSubview(container, at: 0)
 
     for name in QuickBuildOverlay.cornerNames + ["move"] {
       let handle = QuickBuildOverlay.makeHandle(move: name == "move")
@@ -62,6 +63,8 @@ final class QuickBuildOverlay {
     // The bar at the bottom.
     bar.overrideUserInterfaceStyle = .dark
     bar.layer.cornerRadius = 26
+    // The bar is a fixed 52 points tall: its titles stop growing at this size.
+    bar.maximumContentSizeCategory = .extraExtraLarge
     bar.layer.cornerCurve = .continuous
     bar.clipsToBounds = true
     bar.translatesAutoresizingMaskIntoConstraints = false

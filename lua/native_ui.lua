@@ -117,6 +117,11 @@ end
 
 function NativeUI:show(screen)
   local app = self.app
+  -- A panel replaced by another screen is closed, for the tutorial too.
+  local was = self.shown_screen
+  if was ~= screen and SDL.native.screen() == was then
+    self:tutorialPanelClosed(was)
+  end
   self.shown_screen = screen
   if app.world and not unpaused_screens[screen] then
     self:pauseGame()
@@ -170,7 +175,8 @@ function NativeUI:adoptWindows()
     local editor = self.editor
     if window.closed then -- luacheck: ignore 542
     elseif name == "UIEditRoom" then
-      if not (self.quick_build and self.quick_build.edit == window) then
+      if not (self.quick_build and not self.quick_build.finished and
+          self.quick_build.edit == window) then
         if editor then editor:finish() end
         if window.phase == "walls" then
           self.editor = nil
@@ -205,6 +211,24 @@ function NativeUI:close()
   self:resumeGame()
 end
 
+--! The player closed the native screen (Done, a swipe, or another tool):
+-- the game carries on and the tutorial steps back, as closing the game's
+-- window does (UIHireStaff:close, UIBuildRoom:close).
+function NativeUI:screenClosed()
+  self:resumeGame()
+  self:tutorialPanelClosed(self.shown_screen)
+end
+
+function NativeUI:tutorialPanelClosed(screen)
+  local ui = self.app.ui
+  if ui and screen == "hire_staff" then
+    ui:tutorialStep(2, { 2, 3, 4, 5 }, 1)
+    ui:tutorialStep(4, { 2, 3 }, 1)
+  elseif ui and screen == "room_catalog" then
+    ui:tutorialStep(3, { 2, 3 }, 1)
+  end
+end
+
 function NativeUI:pauseGame()
   local world = self.app.world
   if world and not self.resume_speed then
@@ -223,11 +247,24 @@ end
 
 --! Called by UI:addWindow. Returns true if the window was replaced by a native
 -- screen (and so must not be shown).
+--! A game window that won't be shown lets go of the keys it took when it
+-- was built (Return, "e"...) and counts as closed, as Window.close would do
+-- (without its subclass's close, which would act on the game); otherwise a
+-- hardware keyboard would still reach it (a second "delete room", say).
+local function release_keys(ui, window)
+  for key in pairs(window.key_handlers or {}) do
+    ui:removeKeyHandler(key, window)
+  end
+  window.key_handlers = {}
+  window.closed = true
+end
+
 function NativeUI:interceptWindow(ui, window)
   local name = class.type(window)
   if name == "UIConfirmDialog" and self.confirm_next then
     -- The player already confirmed this in a native dialog.
     self.confirm_next = false
+    release_keys(ui, window)
     if window.callback_ok then
       window.callback_ok()
     end
@@ -245,6 +282,7 @@ function NativeUI:interceptWindow(ui, window)
         lines[#lines + 1] = json.text(line)
       end
     end
+    release_keys(ui, window)
     self:message(table.concat(lines, "\n\n"))
     return true
   end
@@ -258,7 +296,8 @@ function NativeUI:interceptWindow(ui, window)
   if screen == nil then
     return false
   end
-  -- The window was built but won't be shown: forget its text boxes.
+  -- The window was built but won't be shown: forget its keys and text boxes.
+  release_keys(ui, window)
   for i = #ui.textboxes, 1, -1 do
     local box = ui.textboxes[i]
     if box.panel and box.panel.window == window then
@@ -298,7 +337,30 @@ end
 -- What the screens show
 
 local function is_inside(dir, path)
-  return path:sub(1, #dir) == dir and not path:find("%.%.", #dir + 1)
+  if path:sub(1, #dir) ~= dir then
+    return false
+  end
+  for part in path:sub(#dir + 1):gmatch("[^/\\]+") do
+    if part == ".." then
+      return false -- (Only a whole "..": "My hospital..sav" is fine.)
+    end
+  end
+  return true
+end
+
+--! A save's file name from what the player typed: no folder separators, no
+-- leading or trailing dots or spaces (two spaces type a full stop on iOS).
+-- Returns nil and why if it can't be used.
+local function save_name(text)
+  local name = tostring(text or ""):gsub("[/\\:]", "-"):gsub("^[%s%.]+", ""):gsub("[%s%.]+$", "")
+  if name == "" then
+    return nil
+  elseif name:lower() == "resume" then
+    -- Resume.sav is the game the app saves whenever it goes into the
+    -- background (and removes on quitting to the menu).
+    return nil, "That name is kept for the game the app saves when you leave it. Pick another."
+  end
+  return name
 end
 
 function NativeUI:listSaves()
@@ -396,7 +458,12 @@ function NativeUI:findCampaigns()
   local app = self.app
   local campaigns, seen = {}, {}
   local function read(path)
-    local info = app:readCampaignFile(path)
+    -- (A broken campaign file in the player's folder mustn't stop the menu.)
+    local ok, info = pcall(app.readCampaignFile, app, path)
+    if not ok then
+      print("Native UI: can't read campaign " .. tostring(path) .. ": " .. tostring(info))
+      return
+    end
     if info and info.name and not seen[info.name] and info.levels and #info.levels > 0 then
       seen[info.name] = true
       campaigns[#campaigns + 1] = { name = info.name, path = path,
@@ -476,6 +543,14 @@ function NativeUI:state()
     state.can_restart = app.map ~= nil
     state.rooms = self:roomList()
     state.hire = self:hireState()
+    -- The game menu's speed picker (applied on Resume) and Hospital screens,
+    -- as the toolbar has them.
+    local toolbar = self:toolbarState()
+    if toolbar then
+      state.speeds = toolbar.speeds
+      state.windows = toolbar.windows
+      state.speed = self.resume_speed or toolbar.speed
+    end
   else
     local difficulties = {}
     if app.fs:fileExists("Levels", "Easy01.SAM") then
@@ -535,15 +610,24 @@ function NativeUI:onTick()
     if self.quick_build:onTick() then
       self.quick_build = nil
     end
-  elseif self.tick_count % 5 == 0 then
-    -- A room editor hidden by Quick Build but no longer driven by it (for
-    -- example in a game saved mid-build) becomes CorsixTH's normal editor.
-    local edit = self.app.ui and self.app.ui:getWindow(UIEditRoom)
-    if edit and edit.visible == false then
-      edit.visible = true
+  elseif self.tick_count % 5 == 0 and not self.editor and not self.pending_adoptions and
+      self.app.ui then
+    -- Editor windows nothing drives (a game saved mid-build or mid-furnishing
+    -- and loaded again: its windows come back from the save rather than
+    -- through UI:addWindow) are taken over again, as when they opened. The
+    -- room editor goes first, so a buying window can join it.
+    local orphans = {}
+    for _, name in ipairs({ "UIEditRoom", "UIFurnishCorridor", "UIPlaceObjects" }) do
+      for _, window in ipairs(self.app.ui.windows or {}) do
+        if class.type(window) == name and not window.closed then
+          orphans[#orphans + 1] = window
+        end
+      end
     end
-    -- Likewise windows moved off screen for native controls.
-    if not self.editor and self.app.ui then
+    if #orphans > 0 then
+      self.pending_adoptions = orphans
+    else
+      -- Anything else left off screen for native controls comes back.
       for _, window in ipairs(self.app.ui.windows or {}) do
         if window.x and window.x <= editing.OFFSCREEN / 2 then
           editing.unhide(window)
@@ -564,16 +648,7 @@ end
 
 -- The player closed the screen (Done, Resume or a swipe).
 function actions.dismissed(self)
-  self:resumeGame()
-  -- Closed by the player: the tutorial steps back, as closing the game's
-  -- window does (UIHireStaff:close, UIBuildRoom:close).
-  local ui = self.app.ui
-  if ui and self.shown_screen == "hire_staff" then
-    ui:tutorialStep(2, { 2, 3, 4, 5 }, 1)
-    ui:tutorialStep(4, { 2, 3 }, 1)
-  elseif ui and self.shown_screen == "room_catalog" then
-    ui:tutorialStep(3, { 2, 3 }, 1)
-  end
+  self:screenClosed()
 end
 
 function actions.editor_button(self, p)
@@ -657,6 +732,10 @@ end
 
 function actions.quick_build_cancel(self)
   local qb = self.quick_build
+  if qb and qb.waiting_for_objects then
+    qb:stopWaiting()
+    return
+  end
   if qb and qb.edit.paid and not qb.edit.closed then
     -- A built room being moved: the game's Cancel here deletes it.
     self:confirm(("Delete this %s? You'll get some of its cost back."):format(
@@ -691,8 +770,12 @@ end
 
 function actions.save(self, p)
   local app = self.app
-  local name = tostring(p.name or ""):gsub("[/\\:]", "-"):gsub("^[%s%.]+", ""):gsub("%s+$", "")
-  if name == "" or not app.world then return end
+  local name, why = save_name(p.name)
+  if why then
+    self:refresh(why)
+    return
+  end
+  if not name or not app.world then return end
   -- Save the game running at the speed it had, not paused by this menu.
   local resume_speed = self.resume_speed
   self:resumeGame()
@@ -716,8 +799,11 @@ function actions.load(self, p)
   self.resume_speed = nil
   local ok, err = pcall(app.load, app, path)
   if not ok then
+    -- As the game's own load window does (UILoadGame:loadError): the main
+    -- menu, saying why (a native alert there).
     err = _S.errors.load_prefix .. tostring(err)
     print(err)
+    app:loadMainMenu()
     app.ui:addWindow(UIInformation(app.ui, { err }))
   end
   self:updateToolbar(true)
@@ -733,9 +819,8 @@ end
 
 function actions.rename_save(self, p)
   local path = tostring(p.path or "")
-  local name = tostring(p.name or ""):gsub("[/\\:]", "-"):gsub("^[%s%.]+", ""):gsub("%s+$", "")
-  local message
-  if name ~= "" and is_inside(self.app.savegame_dir, path) and path:match("%.sav$") then
+  local name, message = save_name(p.name)
+  if name and is_inside(self.app.savegame_dir, path) and path:match("%.sav$") then
     local target = path:match("^(.*[/\\])") .. name .. ".sav"
     if lfs.attributes(target, "mode") then
       message = "There's already a save called " .. name .. "."
@@ -751,11 +836,19 @@ function actions.restart(self)
   local app = self.app
   SDL.native.dismiss()
   self:endQuickBuild()
+  local speed = self.resume_speed
   self.resume_speed = nil
   if app.map then
     self.confirm_next = true
-    app:restart()
-    self.confirm_next = false
+    local ok, err = pcall(app.restart, app)
+    self.confirm_next = false -- (Even if it failed: no later dialog is answered for the player.)
+    if not ok then
+      print("Native UI: couldn't restart: " .. tostring(err))
+      if app.world and app.world:getCurrentSpeed() == "Pause" then
+        app.world:setSpeed(speed or "Normal")
+      end
+      self:message("Couldn't restart the level.")
+    end
   end
 end
 
@@ -830,7 +923,11 @@ end
 local function start(self, fn)
   SDL.native.dismiss()
   self:endQuickBuild()
-  fn()
+  local ok, err = pcall(fn)
+  if not ok then
+    print("Native UI: couldn't start the game: " .. tostring(err))
+    self:message("Couldn't start that game.")
+  end
   if not self.app.world then
     -- Didn't work: CorsixTH has shown why; offer the menu again.
     self:show("main_menu")
