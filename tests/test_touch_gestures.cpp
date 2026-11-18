@@ -28,11 +28,13 @@ std::string describe(const std::vector<mouse_action>& v) {
                        : a.type == kind::press ? "press"
                        : a.type == kind::pan   ? "pan"
                        : a.type == kind::zoom  ? "zoom"
+                       : a.type == kind::scroll ? "scroll"
                                                : "release";
     if (a.type == kind::zoom) {
       std::snprintf(buf, sizeof(buf), "%s%+d(%d,%d) ", name, a.distance, a.x,
                     a.y);
-    } else if (a.type == kind::move || a.type == kind::pan) {
+    } else if (a.type == kind::move || a.type == kind::pan ||
+               a.type == kind::scroll) {
       std::snprintf(buf, sizeof(buf), "%s(%d,%d) ", name, a.x, a.y);
     } else {
       std::snprintf(buf, sizeof(buf), "%s%d(%d,%d) ", name, a.button, a.x,
@@ -424,6 +426,47 @@ int main() {
       ++failures;
       std::printf("FAIL trackpad: unpaired buttons or cursor off screen\n");
     }
+  }
+
+  // Pushing the cursor against an edge with a finger scrolls the map: after
+  // a moment (so aiming near the edge doesn't), speeding up, and only while
+  // the finger is down.
+  auto to_right_edge = [&](trackpad_recogniser& g, std::vector<mouse_action>& out) {
+    g.finger_down(1, 100, 200, 1000, out);
+    for (int i = 1; i <= 60; ++i) {
+      g.finger_move(1, 100 + 10 * i, 200, 1000 + 40 * i, out);  // slow: 1:1
+    }
+    out.clear();  // The cursor is now at the right edge (999, 240).
+  };
+  {
+    auto g = trackpad();
+    std::vector<mouse_action> out;
+    to_right_edge(g, out);
+    g.tick(3400, out);  // reaches the edge
+    g.tick(3500, out);  // not yet: aiming near the edge
+    expect("edge: no scrolling at first", out, "");
+    g.tick(3600, out);
+    g.tick(3650, out);
+    g.tick(4600, out);
+    expect("edge: then it scrolls that way, faster as it's held", out,
+           "scroll(13,0) scroll(16,0) scroll(40,0) ");
+    out.clear();
+    g.finger_up(1, 700, 200, 4700, out);
+    g.tick(4800, out);
+    g.tick(5000, out);
+    expect("edge: lifting the finger stops it (the cursor stays at the edge)", out, "");
+  }
+  {
+    auto g = trackpad();
+    std::vector<mouse_action> out;
+    to_right_edge(g, out);
+    g.finger_up(1, 700, 200, 3400, out);
+    out.clear();
+    g.finger_down(1, 300, 300, 3500, out);  // a tap with the cursor at the edge
+    g.tick(3700, out);
+    g.tick(3900, out);
+    g.finger_up(1, 300, 300, 3950, out);
+    expect("edge: a still finger with the cursor at the edge doesn't scroll", out, "");
   }
 
   // Placing things (trackpad in pointer mode): a drag moves the item like

@@ -335,6 +335,7 @@ void trackpad_recogniser::set_pointer_mode(bool on) {
 }
 
 void trackpad_recogniser::tick(uint32_t now, std::vector<mouse_action>& out) {
+  edge_scroll(now, out);
   if (!pointer_mode || st != state::pending || fingers.size() != 1 ||
       now - down_time < cfg.long_press_ms) {
     return;
@@ -348,6 +349,46 @@ void trackpad_recogniser::tick(uint32_t now, std::vector<mouse_action>& out) {
   fingers.front().start_y = f.y;
   st = state::tracking;
   last_move_time = now;
+}
+
+void trackpad_recogniser::edge_scroll(uint32_t now, std::vector<mouse_action>& out) {
+  // Only while a finger is moving the cursor: one resting at the edge after
+  // a tap mustn't scroll.
+  int ex = 0;
+  int ey = 0;
+  if ((st == state::tracking || st == state::dragging) && fingers.size() == 1 &&
+      bounds_w > 0 && bounds_h > 0) {
+    ex = cursor_x() <= 0 ? -1 : cursor_x() >= bounds_w - 1 ? 1 : 0;
+    ey = cursor_y() <= 0 ? -1 : cursor_y() >= bounds_h - 1 ? 1 : 0;
+  }
+  if (ex == 0 && ey == 0) {
+    edge_since = 0;
+    return;
+  }
+  if (edge_since == 0) {
+    edge_since = now;
+    edge_last = now;
+    edge_x = 0;
+    edge_y = 0;
+    return;
+  }
+  uint32_t held = now - edge_since;
+  uint32_t dt = std::min<uint32_t>(now - edge_last, 50);  // (after a stall, don't jump)
+  edge_last = now;
+  if (held < cfg.edge_delay_ms) {
+    return;
+  }
+  double ramp = std::min(1.0, (held - cfg.edge_delay_ms) / 1000.0);
+  double speed = cfg.edge_speed + (cfg.edge_speed_max - cfg.edge_speed) * ramp;
+  edge_x += ex * speed * dt;
+  edge_y += ey * speed * dt;
+  int sx = static_cast<int>(edge_x);
+  int sy = static_cast<int>(edge_y);
+  edge_x -= sx;
+  edge_y -= sy;
+  if (sx != 0 || sy != 0) {
+    out.push_back({mouse_action::kind::scroll, 0, sx, sy});
+  }
 }
 
 void trackpad_recogniser::warp_cursor(int x, int y) {

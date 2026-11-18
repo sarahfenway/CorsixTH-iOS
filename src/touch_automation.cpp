@@ -337,16 +337,17 @@ bool run_command(lua_State* L, const std::string& line, uint32_t now) {
     add_moves(f, a, b, now + 16, 400);
     add_finger(SDL_FINGERUP, f, b, now + 432);
   } else if (command == "drag") {
-    if (!parse_numbers(rest, 5, &n)) {
-      return bad("drag <x1> <y1> <x2> <y2> <ms>");
+    if (!parse_numbers(rest, 5, &n) && !parse_numbers(rest, 6, &n)) {
+      return bad("drag <x1> <y1> <x2> <y2> <ms> [hold ms]");
     }
     point a = to_window(n[0], n[1]);
     point b = to_window(n[2], n[3]);
     uint32_t ms = static_cast<uint32_t>(std::max(n[4], 16.0));
+    uint32_t hold = n.size() > 5 ? static_cast<uint32_t>(std::max(n[5], 0.0)) : 0;
     SDL_FingerID f = s.next_finger++;
     add_finger(SDL_FINGERDOWN, f, a, now);
     add_moves(f, a, b, now + 16, ms);
-    add_finger(SDL_FINGERUP, f, b, now + 32 + ms);
+    add_finger(SDL_FINGERUP, f, b, now + 32 + ms + hold);
   } else if (command == "twofinger_tap") {
     if (!parse_numbers(rest, 2, &n)) return bad("twofinger_tap <x> <y>");
     point p = to_window(n[0], n[1]);

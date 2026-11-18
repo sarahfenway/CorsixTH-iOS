@@ -39,7 +39,9 @@ struct lua_State;
       tap_at <lua expression>           tap where a Lua expression says: a
                                         table {x, y} (in the current coords)
       long_press_at <lua expression>    the same, held for 0.8 s
-      drag <x1> <y1> <x2> <y2> <ms>     one finger
+      drag <x1> <y1> <x2> <y2> <ms> [hold]
+                                        one finger, held still at the end for
+                                        hold ms before it lifts
       drag_at <lua expression>          one finger over 0.4 s, where a Lua
                                         expression says: {x1, y1, x2, y2}
       twofinger_tap <x> <y>

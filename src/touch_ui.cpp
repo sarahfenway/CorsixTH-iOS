@@ -22,6 +22,7 @@ SOFTWARE.
 
 #include "touch_ui.h"
 
+#include "native_bridge.h"
 #include "touch_automation.h"
 #include "touch_gestures.h"
 #include "touch_layout.h"
@@ -196,6 +197,13 @@ void flush_actions() {
         ev.mgesture.y = static_cast<float>(a.y) / logical_h;
         SDL_PushEvent(&ev);
         continue;
+      case mouse_action::kind::scroll: {
+        // Edge scrolling: the game scrolls its map (lua native_hud.lua).
+        char json[64];
+        std::snprintf(json, sizeof(json), "{\"dx\":%d,\"dy\":%d}", a.x, a.y);
+        cth_native_post("scroll_map", json);
+        continue;
+      }
       case mouse_action::kind::press:
       case mouse_action::kind::release: {
         bool press = a.type == mouse_action::kind::press;

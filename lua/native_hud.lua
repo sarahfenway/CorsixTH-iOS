@@ -300,4 +300,14 @@ function actions.open_window(self, p)
   end
 end
 
+--! Edge scrolling (touch_gestures.h): a finger is pushing the cursor against
+-- an edge, so the map scrolls that way, as the game's own edge scrolling does
+-- with a mouse (screen pixels; the map's offsets are unzoomed).
+function actions.scroll_map(self, p)
+  local ui = self.app.ui
+  if ui and ui.scrollMap and ui.zoom_factor then
+    ui:scrollMap((tonumber(p.dx) or 0) / ui.zoom_factor, (tonumber(p.dy) or 0) / ui.zoom_factor)
+  end
+end
+
 return { methods = NativeUI, actions = actions }

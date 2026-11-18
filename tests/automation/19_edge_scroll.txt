@@ -1,0 +1,24 @@
+# One-finger edge scrolling: moving the cursor into an edge and keeping the
+# finger there scrolls the map that way; lifting stops it, and a cursor left
+# at the edge (say after a tap there) doesn't scroll on its own.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+lua rawset(_G, "auto_offset", function() return {TheApp.ui.screen_offset_x, TheApp.ui.screen_offset_y} end); local o = auto_offset(); rawset(_G, "auto_start", o); return o[1] .. "," .. o[2]
+# Slowly right by far more than the screen is wide, then hold for 1.5 s.
+drag 200 300 650 300 900 1500
+wait 2600
+lua local o, s = auto_offset(), rawget(_G, "auto_start"); rawset(_G, "auto_after", o); return (o[1] - s[1]) .. "," .. (o[2] - s[2]) .. " cursor " .. TheApp.ui.cursor_x
+expect TheApp.ui.cursor_x >= TheApp.config.width - 2
+expect rawget(_G, "auto_after")[1] - rawget(_G, "auto_start")[1] > 100
+expect math.abs(rawget(_G, "auto_after")[2] - rawget(_G, "auto_start")[2]) < 10
+screenshot 1_scrolled
+# Finger up: the cursor stays at the edge but the map stays put.
+wait 1000
+expect auto_offset()[1] == rawget(_G, "auto_after")[1]
+# A tap with the cursor at the edge doesn't scroll either.
+tap 300 200
+wait 1000
+expect auto_offset()[1] == rawget(_G, "auto_after")[1]

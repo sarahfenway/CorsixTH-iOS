@@ -40,7 +40,8 @@ struct mouse_action {
   //! the pointer.
   //! zoom: the fingers' spacing changed by `distance` (positive = apart)
   //! around their centre (x, y).
-  enum class kind { move, press, release, pan, zoom };
+  //! scroll: scroll the map by (x, y) screen pixels (the view moves that way).
+  enum class kind { move, press, release, pan, zoom, scroll };
   kind type;
   int button;  // button_left / button_middle / button_right; unused otherwise
   int x;
@@ -148,6 +149,9 @@ class gesture_recogniser {
     - two-finger drag               -> pans the map; the cursor stays put
     - pinch                         -> zoom, once the spacing has changed by
                                        more than pinch_threshold
+    - moving finger, cursor pinned  -> scrolls the map that way (after
+      against an edge                  edge_delay_ms, speeding up), until the
+                                       finger lifts
 
     In pointer mode (placing things) nothing clicks with the left button: a
     drag moves the pointer (and the item being placed) exactly as far as the
@@ -165,6 +169,9 @@ class trackpad_recogniser {
     int pinch_threshold = 28;          // change in finger spacing before zooming
     double speed = 1.0;                // cursor speed multiplier
     uint32_t long_press_ms = 500;      // pointer mode: still touch -> right click
+    uint32_t edge_delay_ms = 150;      // cursor at an edge this long before it scrolls
+    double edge_speed = 0.25;          // then scrolls at this many pixels per ms...
+    double edge_speed_max = 0.8;       // ...rising to this over a second
   };
 
   trackpad_recogniser() = default;
@@ -187,7 +194,8 @@ class trackpad_recogniser {
 
   //! Pointer mode, for placing things (see the class comment).
   void set_pointer_mode(bool on);
-  //! Handles the long press of pointer mode. Call regularly.
+  //! Handles the long press of pointer mode and edge scrolling. Call
+  //! regularly (every frame or so).
   void tick(uint32_t now, std::vector<mouse_action>& out);
 
   int cursor_x() const;
@@ -236,6 +244,12 @@ class trackpad_recogniser {
   double cy{0};
   bool cursor_announced{false};
   bool pointer_mode{false};
+  uint32_t edge_since{0};  // When the cursor was first pushed against an edge.
+  uint32_t edge_last{0};
+  double edge_x{0};  // Scrolling not yet sent (less than a pixel).
+  double edge_y{0};
+
+  void edge_scroll(uint32_t now, std::vector<mouse_action>& out);
 };
 
 }  // namespace touch_ui
