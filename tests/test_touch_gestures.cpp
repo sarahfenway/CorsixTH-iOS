@@ -428,6 +428,49 @@ int main() {
     }
   }
 
+  {
+    // The game moved the pointer before any touch (to someone just picked
+    // up): learning the screen's size on the first touch keeps it there.
+    trackpad_recogniser g;
+    std::vector<mouse_action> out;
+    g.warp_cursor(250, 300);
+    g.set_bounds(1000, 480);
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_up(1, 100, 100, 1080, out);
+    expect("trackpad: a pointer placed before the first touch stays put", out,
+           "press1(250,300) release1(250,300) ");
+  }
+
+  // Carrying someone (picked up): a drag moves them 1:1, and a tap anywhere
+  // drops them where they are (a left click at the cursor).
+  auto carrying = [] {
+    trackpad_recogniser t;
+    t.set_bounds(1000, 480);  // cursor starts at (500, 240)
+    t.set_pointer_mode(trackpad_recogniser::pointer::carry);
+    return t;
+  };
+  {
+    auto g = carrying();
+    std::vector<mouse_action> out;
+    g.finger_down(1, 100, 100, 1000, out);
+    g.finger_move(1, 120, 100, 1010, out);  // fast, but 1:1
+    g.finger_move(1, 160, 100, 1020, out);
+    g.finger_up(1, 160, 100, 1030, out);
+    g.finger_down(1, 800, 400, 1500, out);  // a tap anywhere
+    g.finger_up(1, 800, 400, 1580, out);
+    expect("carrying: a drag moves them, a tap anywhere drops them there", out,
+           "move(500,240) move(520,240) move(560,240) press1(560,240) release1(560,240) ");
+  }
+  {
+    auto g = carrying();
+    std::vector<mouse_action> out;
+    g.finger_down(1, 300, 300, 1000, out);
+    g.tick(1700, out);  // no long press while carrying
+    g.finger_up(1, 300, 300, 1800, out);
+    expect("carrying: a long still touch drops them too (no right click)", out,
+           "move(500,240) press1(500,240) release1(500,240) ");
+  }
+
   // Pushing the cursor against an edge with a finger scrolls the map: after
   // a moment (so aiming near the edge doesn't), speeding up, and only while
   // the finger is down.
@@ -470,13 +513,14 @@ int main() {
   }
 
   // Placing things (trackpad in pointer mode): a drag moves the item like
-  // the cursor, but 1:1 however fast, so the finger never hides it; a tap moves it to the finger;
-  // nothing is placed on lift (the native Place button does that); a long
-  // press right-clicks under the finger (picks a placed item up).
+  // the cursor, but 1:1 however fast, so the finger never hides it, and
+  // places nothing on lift; a tap anywhere places it where it is (a left
+  // click at the cursor); a long press right-clicks under the finger (picks
+  // a placed item up).
   auto placing = [] {
     trackpad_recogniser t;
     t.set_bounds(1000, 480);  // cursor starts at (500, 240)
-    t.set_pointer_mode(true);
+    t.set_pointer_mode(trackpad_recogniser::pointer::place);
     return t;
   };
   {
@@ -484,8 +528,8 @@ int main() {
     std::vector<mouse_action> out;
     g.finger_down(1, 100, 100, 1000, out);
     g.finger_up(1, 101, 101, 1080, out);
-    expect("placing: a tap moves the pointer to the finger, no click", out,
-           "move(500,240) move(101,101) ");
+    expect("placing: a tap anywhere places it where it is", out,
+           "move(500,240) press1(500,240) release1(500,240) ");
   }
   {
     auto g = placing();
@@ -534,7 +578,7 @@ int main() {
     g.finger_move(1, 310, 300, 1232, out);
     g.finger_up(1, 310, 300, 1300, out);
     expect("placing: tap then drag doesn't hold the button", out,
-           "move(500,240) move(100,100) move(110,100) ");
+           "move(500,240) press1(500,240) release1(500,240) move(510,240) ");
   }
   {
     auto g = placing();
@@ -553,7 +597,7 @@ int main() {
   }
   {
     auto g = placing();
-    g.set_pointer_mode(false);  // Placing over: taps click again.
+    g.set_pointer_mode(trackpad_recogniser::pointer::none);  // Placing over: taps click again.
     std::vector<mouse_action> out;
     g.finger_down(1, 100, 100, 1000, out);
     g.finger_up(1, 100, 100, 1080, out);

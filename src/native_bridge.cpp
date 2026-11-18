@@ -295,11 +295,15 @@ int l_render_to_png(lua_State* L) {
 }
 
 // setPlacementTouch(mode): the native editors' touch controls: "place"
-// (placing an item), true or "pick" (direct taps), false (the player's own).
+// (placing an item), "carry" (carrying a person), true or "pick" (direct
+// taps), false (the player's own).
 int l_set_placement_touch(lua_State* L) {
   touch_ui::placement_touch mode = touch_ui::placement_touch::off;
-  if (lua_type(L, 1) == LUA_TSTRING && std::strcmp(lua_tostring(L, 1), "place") == 0) {
+  const char* name = lua_type(L, 1) == LUA_TSTRING ? lua_tostring(L, 1) : "";
+  if (std::strcmp(name, "place") == 0) {
     mode = touch_ui::placement_touch::place;
+  } else if (std::strcmp(name, "carry") == 0) {
+    mode = touch_ui::placement_touch::carry;
   } else if (lua_toboolean(L, 1)) {
     mode = touch_ui::placement_touch::pick;
   }

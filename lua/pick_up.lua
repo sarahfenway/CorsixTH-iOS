@@ -25,9 +25,10 @@ SOFTWARE. --]]
 -- and quick, so in Pick Up mode (the pinching hand) everyone on screen gets
 -- a tag that follows them; tapping it is that right click. Any UIPlaceStaff,
 -- however it opened (Pick Up, a two-finger tap on someone, or a hire the
--- native panel couldn't place), is then dropped as items are placed: touches
--- move the person (SDL.native.setPlacementTouch("place")) and Drop clicks
--- where the game says they can go.
+-- native panel couldn't place), is then carried by touch
+-- (SDL.native.setPlacementTouch("carry")): a drag moves the person and a tap
+-- anywhere drops them, a left click where they are, which the game only
+-- accepts where they can go.
 
 local json = corsixth.require("ios.json")
 local SDL = require("sdl")
@@ -44,13 +45,13 @@ end
 local PickUp = {}
 PickUp.__index = PickUp
 
---! Pick Up mode, from the toolbar: tags on the people on screen.
+--! Pick Up mode, from the toolbar: tags on the people on screen. It ends once
+-- someone's been dropped (or put back), or with Done.
 function PickUp.start(native)
   local self = setmetatable({}, PickUp)
   self.native = native
   self.app = native.app
   self.ui = native.app.ui
-  self.keep_going = true -- After a drop, carry on picking people up.
   self.ids = setmetatable({}, { __mode = "k" })
   self.people = setmetatable({}, { __mode = "v" })
   self.next_id = 1
@@ -61,14 +62,13 @@ end
 --! A UIPlaceStaff opened some other way: drop that person, then finish.
 function PickUp.adoptPlacer(native, placer)
   local self = PickUp.start(native)
-  self.keep_going = false
   self:take(placer)
   return self
 end
 
 function PickUp:take(placer)
   self.placer = placer
-  SDL.native.setPlacementTouch("place")
+  SDL.native.setPlacementTouch("carry")
   -- The person starts where they were picked up (a new hire: the middle).
   local staff = placer.staff
   local ui = self.ui
@@ -109,6 +109,9 @@ function PickUp:tags()
 end
 
 function PickUp:sendState(force)
+  if self.finished then
+    return -- (Showing the bar again would leave it on screen.)
+  end
   local placer = self.placer
   local state = {
     logical = { self.app.config.width, self.app.config.height },
@@ -118,11 +121,9 @@ function PickUp:sendState(force)
     local name = placer.profile and self.native.titleCase(json.text(placer.profile:getFullName())) or ""
     local valid = placer:_isValidStaffPlacement()
     state.title = name
-    state.hint = valid and "Drag to where they should go, then Drop" or "They can't go there"
-    state.buttons = {
-      button("cancel", nil, "xmark"),
-      button("drop", "Drop", "arrow.down.to.line", valid, true),
-    }
+    state.hint = valid and "Drag them where they should go, then tap to drop" or
+        "They can't go there: drag them somewhere else"
+    state.buttons = { button("cancel", "Put Back", "arrow.uturn.backward") }
   else
     state.title = "Pick Up"
     state.hint = "Tap someone to pick them up"
@@ -151,13 +152,9 @@ function PickUp:onTick()
   end
   local placer = self.placer
   if placer and placer.closed then
-    -- Dropped (or put back): pick someone else up, or that's it.
-    self.placer = nil
-    if not self.keep_going then
-      self:finish()
-      return true
-    end
-    SDL.native.setPlacementTouch(false)
+    -- Dropped (or put back): that's it.
+    self:finish()
+    return true
   end
   if not self.placer then
     local window = self.ui:getWindow(UIPlaceStaff)
@@ -185,11 +182,7 @@ function PickUp:pressed(id)
   local placer = self.placer
   if id == "done" then
     self:finish()
-  elseif id == "drop" and placer and not placer.closed then
-    if placer:_isValidStaffPlacement() then
-      -- As left-clicking there.
-      placer:onMouseUp("left", self.ui.cursor_x, self.ui.cursor_y)
-    end
+    return
   elseif id == "cancel" and placer and not placer.closed then
     placer:close() -- As right-clicking: the game puts them back to work.
   end

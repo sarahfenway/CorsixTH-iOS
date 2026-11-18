@@ -310,8 +310,10 @@ void trackpad_recogniser::set_bounds(int width, int height) {
   if (width <= 0 || height <= 0) {
     return;
   }
-  if (bounds_w == 0 || bounds_h == 0) {
-    cx = width / 2.0;  // The cursor starts in the middle of the screen.
+  if ((bounds_w == 0 || bounds_h == 0) && !cursor_announced) {
+    // The cursor starts in the middle of the screen, unless the game has
+    // already put it somewhere (warp_cursor).
+    cx = width / 2.0;
     cy = height / 2.0;
   }
   bounds_w = width;
@@ -328,15 +330,16 @@ int trackpad_recogniser::cursor_y() const {
   return static_cast<int>(std::lround(cy));
 }
 
-void trackpad_recogniser::set_pointer_mode(bool on) {
-  pointer_mode = on;
+void trackpad_recogniser::set_pointer_mode(pointer mode) {
+  pointer_mode = mode != pointer::none;
+  pointer_long_press = mode == pointer::place;
   last_was_tap = false;
   drag_armed = false;
 }
 
 void trackpad_recogniser::tick(uint32_t now, std::vector<mouse_action>& out) {
   edge_scroll(now, out);
-  if (!pointer_mode || st != state::pending || fingers.size() != 1 ||
+  if (!pointer_mode || !pointer_long_press || st != state::pending || fingers.size() != 1 ||
       now - down_time < cfg.long_press_ms) {
     return;
   }
@@ -560,7 +563,8 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
     prev_x = f->start_x;
     prev_y = f->start_y;
     last_move_time = now;
-    move_cursor((x - prev_x) * cfg.speed, (y - prev_y) * cfg.speed, out);
+    double speed = pointer_mode ? 1.0 : cfg.speed;  // (placing: as far as the finger)
+    move_cursor((x - prev_x) * speed, (y - prev_y) * speed, out);
     return;
   }
   if (st == state::tracking || st == state::dragging) {
@@ -573,7 +577,8 @@ void trackpad_recogniser::finger_move(int64_t finger, int x, int y,
     double velocity = std::sqrt(dx * dx + dy * dy) / dt;  // pixels per ms
     double gain = pointer_mode ? 1.0 : 1.0 + std::clamp((velocity - 0.25) * 0.8, 0.0, 1.5);
     last_move_time = now;
-    move_cursor(dx * gain * cfg.speed, dy * gain * cfg.speed, out);
+    double speed = pointer_mode ? 1.0 : cfg.speed;
+    move_cursor(dx * gain * speed, dy * gain * speed, out);
   }
 }
 
@@ -612,10 +617,9 @@ void trackpad_recogniser::finger_up(int64_t finger, int x, int y,
   remove(finger);
   if (finger == primary) {
     if (st == state::pending && pointer_mode) {
-      // Pointer mode: a tap (or a still touch let go before the long press)
-      // moves the pointer to the finger.
-      warp_cursor(x, y);
-      out.push_back({mouse_action::kind::move, 0, cursor_x(), cursor_y()});
+      // Placing or carrying: a touch that didn't move puts it down where it
+      // is. (A long press has already moved on to tracking.)
+      click(button_left, out);
     } else if (st == state::pending && now - down_time <= cfg.tap_ms) {
       click(button_left, out);
       last_was_tap = true;

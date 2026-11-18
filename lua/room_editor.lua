@@ -24,9 +24,9 @@ SOFTWARE. --]]
 -- The game's windows (UIEditRoom, UIFurnishCorridor, UIPlaceObjects) keep
 -- doing all the work; they're just moved off screen. While placing, touches
 -- move the game's pointer (SDL.native.setPlacementTouch("place")): a drag
--- moves the item's ghost, a tap moves it to the finger, a long press picks a
--- placed item up (right click). Nothing is placed until the bar's Place
--- button, which clicks as the mouse would. These sessions add the native
+-- moves the item's ghost, a tap anywhere places it where it is (the game's
+-- left click), a long press picks a placed item up (right click). The bar's
+-- Place button clicks the same way. These sessions add the native
 -- bar, wall markers and item tray, and call the game's functions for what
 -- those offer.
 
@@ -123,7 +123,7 @@ local function placing_hint(window)
   if #window.objects == 0 then
     return "Long press an item to move it"
   elseif window.object_blueprint_good then
-    return "Drag to move it, then Place"
+    return "Drag to move it, then tap to place"
   end
   return "Doesn't fit here: drag it somewhere else"
 end

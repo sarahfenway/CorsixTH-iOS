@@ -122,17 +122,18 @@ any fax messages under them. The toolbar at the top right has:
   and wages. The person you hire starts at a free reception desk (receptionists) or in the
   corridor, and the game sends them where they're needed.
 - **Pick Up** (pinching hand): everyone on screen gets a tag above their head that follows them, even
-  behind walls. Tap a tag to pick that person up (to get a doctor off a break, say), drag or tap
-  to move them, then **Drop**, which lights up where they can go. ✕ puts them back. Someone
-  picked up with a two-finger tap gets the same Drop bar.
+  behind walls. Tap a tag to pick that person up (to get a doctor off a break, say), drag to move
+  them, then tap anywhere to drop them (they turn red where they can't go), which ends Pick Up.
+  **Put Back** returns them. Someone picked up with a two-finger tap is carried the same way.
 - **Hospital** (building icon): the staff, town map, research, casebook, graphs, bank and other
   screens.
 - **Speed** (play button), and **•••** for the game menu (save, load, settings, restart, quit),
   which pauses the game.
 
 While placing anything, the item starts somewhere it fits. Drag anywhere to move it (it moves as
-far as your finger, so your finger never hides it) or tap where it should go, then press **Place**,
-which only lights up where the item fits. A long press on a placed item picks it up again.
+far as your finger, so your finger never hides it), then tap anywhere to put it down there (or
+press **Place**, which only lights up where the item fits). A long press on a placed item picks it
+up again.
 
 - **The adviser** speaks from a card at the bottom left: tap for his next message, long press to
   dismiss them all. Past messages are under Hospital > Adviser Messages.

@@ -500,11 +500,13 @@ void set_placement_mode(placement_touch mode) {
     trackpad_before_placement = trackpad_mode;
   }
   placing = mode;
-  trackpad.set_pointer_mode(mode == placement_touch::place);
+  trackpad.set_pointer_mode(mode == placement_touch::place   ? trackpad_recogniser::pointer::place
+                            : mode == placement_touch::carry ? trackpad_recogniser::pointer::carry
+                                                             : trackpad_recogniser::pointer::none);
   if (mode == placement_touch::off) {
     set_controls(trackpad_before_placement ? "trackpad" : "direct");
   } else {
-    set_controls(mode == placement_touch::place ? "trackpad" : "direct");
+    set_controls(mode == placement_touch::pick ? "direct" : "trackpad");
   }
 }
 

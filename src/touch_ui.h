@@ -81,8 +81,10 @@ void set_controls(const char* name);
 //!    like the trackpad, so the finger never hides it; a tap moves it to the
 //!    finger; a long press right-clicks there (picks a placed item up).
 //!    Nothing is placed by touch: the editor's Place button does that.
+//!  - carry: carrying a person who's been picked up. A drag moves them the
+//!    same way; a tap anywhere drops them where they are (a left click).
 //! off restores the player's own controls.
-enum class placement_touch { off, pick, place };
+enum class placement_touch { off, pick, place, carry };
 void set_placement_mode(placement_touch mode);
 placement_touch placement_mode();
 

@@ -153,11 +153,13 @@ class gesture_recogniser {
       against an edge                  edge_delay_ms, speeding up), until the
                                        finger lifts
 
-    In pointer mode (placing things) nothing clicks with the left button: a
-    drag moves the pointer (and the item being placed) exactly as far as the
-    finger moves (no acceleration), a tap moves
-    it to the finger, and a long press right-clicks under the finger (picks a
-    placed item up). Two fingers still pan and zoom.
+    Pointer modes, for placing things (two fingers still pan and zoom):
+    - place (an item): a drag moves the pointer (and the item) exactly as far
+      as the finger moves (no acceleration) and clicks nothing; a tap
+      anywhere places it where it is (a left click at the cursor); a long
+      press right-clicks under the finger (picks a placed item up).
+    - carry (a person who's been picked up): the same, without the long press
+      (a tap drops them).
 */
 class trackpad_recogniser {
  public:
@@ -192,8 +194,9 @@ class trackpad_recogniser {
   //! Cursor speed multiplier (1 = the finger's own distance).
   void set_speed(double speed) { cfg.speed = speed; }
 
-  //! Pointer mode, for placing things (see the class comment).
-  void set_pointer_mode(bool on);
+  //! Pointer modes, for placing things (see the class comment).
+  enum class pointer { none, place, carry };
+  void set_pointer_mode(pointer mode);
   //! Handles the long press of pointer mode and edge scrolling. Call
   //! regularly (every frame or so).
   void tick(uint32_t now, std::vector<mouse_action>& out);
@@ -243,7 +246,8 @@ class trackpad_recogniser {
   double cx{0};
   double cy{0};
   bool cursor_announced{false};
-  bool pointer_mode{false};
+  bool pointer_mode{false};  // place or carry
+  bool pointer_long_press{false};  // place: a long press right-clicks
   uint32_t edge_since{0};  // When the cursor was first pushed against an edge.
   uint32_t edge_last{0};
   double edge_x{0};  // Scrolling not yet sent (less than a pixel).
