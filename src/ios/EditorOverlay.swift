@@ -23,8 +23,11 @@ struct EditorMarker: Decodable, Hashable {
   var x: Double
   var y: Double
   // "wall", "door", "bad" (a door that can't go there), "window",
-  // "door_fixed" (the door, shown in the windows stage; not tappable)
+  // "door_fixed" (the door, shown in the windows stage; not tappable), or a
+  // person's tag in Pick Up mode: "doctor", "nurse", "handyman",
+  // "receptionist"
   var state: String
+  var label: String?  // A person's name (VoiceOver, tests)
 }
 
 struct TrayPlaceRow: Decodable, Hashable, Identifiable {
@@ -218,8 +221,9 @@ final class EditorOverlay {
     }
     for marker in markers {
       let view = markerViews[marker.id] ?? makeMarker(id: marker.id)
-      view.center = toPoints(marker.x, marker.y)
       style(view, state: marker.state)
+      view.center = toPoints(marker.x, marker.y)
+      if let label = marker.label { view.accessibilityLabel = label }
     }
     // Keep the bar and tray above the markers.
     container.bringSubviewToFront(trayHost.view)
@@ -245,7 +249,26 @@ final class EditorOverlay {
   private func style(_ b: UIButton, state: String) {
     let symbol: String
     let colour: UIColor
+    // People's tags are bigger: they're a finger's target on someone moving.
+    let person = ["doctor", "nurse", "handyman", "receptionist"].contains(state)
+    let size: CGFloat = person ? 40 : 34
+    if b.bounds.width != size {
+      b.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+      b.layer.cornerRadius = size / 2
+    }
     switch state {
+    case "doctor":
+      symbol = "stethoscope"
+      colour = .systemBlue
+    case "nurse":
+      symbol = "cross.case.fill"
+      colour = .systemPink
+    case "handyman":
+      symbol = "wrench.and.screwdriver.fill"
+      colour = .systemOrange
+    case "receptionist":
+      symbol = "bell.fill"
+      colour = .systemPurple
     case "door", "door_fixed":
       symbol = "door.left.hand.open"
       colour = .systemGreen

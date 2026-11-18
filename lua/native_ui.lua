@@ -32,6 +32,7 @@ SOFTWARE. --]]
 local json = corsixth.require("ios.json")
 local QuickBuild = corsixth.require("ios.quick_build")
 local editing = corsixth.require("ios.room_editor")
+local PickUp = corsixth.require("ios.pick_up")
 local SDL = require("sdl")
 local TH = require("TH")
 local pathsep = package.config:sub(1, 1)
@@ -514,6 +515,14 @@ function NativeUI:onTick()
   end
   if self.editor and self.editor:onTick() then
     self.editor = nil
+  end
+  if not self.editor and not self.quick_build and self.app.ui then
+    -- Someone being carried (picked up with a two-finger tap, or a hire that
+    -- couldn't be placed): drop them by touch.
+    local placer = self.app.ui:getWindow(UIPlaceStaff)
+    if placer and not placer.closed then
+      self.editor = PickUp.adoptPlacer(self, placer)
+    end
   end
   if self.tick_count % 5 == 0 then
     self:updateToolbar(false)

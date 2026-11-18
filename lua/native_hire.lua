@@ -148,10 +148,9 @@ function actions.hire(self, p)
   local placer = UIPlaceStaff(ui, profile, app.config.width / 2, app.config.height / 2)
   ui:addWindow(placer)
   if not self:placeStaff(placer) then
-    -- The game's own placement carries on: the person follows the cursor
-    -- until the player taps where they should go.
+    -- Nowhere the game accepts (paused, say): the player drops them, as a
+    -- picked-up person (lua/pick_up.lua takes the UIPlaceStaff).
     SDL.native.dismiss()
-    self:message("Tap where " .. json.text(profile:getFullName()) .. " should start work.")
     return
   end
   self:refresh()

@@ -26,6 +26,7 @@ SOFTWARE. --]]
 
 local json = corsixth.require("ios.json")
 local editing = corsixth.require("ios.room_editor")
+local PickUp = corsixth.require("ios.pick_up")
 local SDL = require("sdl")
 
 local NativeUI = {} -- Methods, added to the real NativeUI.
@@ -222,6 +223,18 @@ local tools = {
 function actions.tool(self, p)
   local ui = self.app.ui
   local panel = ui and ui.bottom_panel
+  if p.id == "pickup" and panel then
+    -- Pick Up mode (lua/pick_up.lua); the button again ends it.
+    local picking = self.editor and getmetatable(self.editor) == PickUp
+    if self.editor then
+      self.editor:finish()
+      self.editor = nil
+    end
+    if not picking then
+      self.editor = PickUp.start(self)
+    end
+    return
+  end
   if panel and tools[p.id] then
     tools[p.id](panel)
     if p.id == "edit" then

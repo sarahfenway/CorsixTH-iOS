@@ -135,6 +135,9 @@ final class GameToolbar {
     let hire = button(symbol: "person.badge.plus", label: "Hire Staff") {
       NativeUI.post("tool", ["id": "hire"])
     }
+    let pickUp = button(symbol: "hand.pinch.fill", label: "Pick Up") {
+      NativeUI.post("tool", ["id": "pickup"])
+    }
     configure(hospitalButton, symbol: "building.2.fill", label: "Hospital", action: nil)
     hospitalButton.showsMenuAsPrimaryAction = true
     configure(speedButton, symbol: "play.fill", label: "Game Speed", action: nil)
@@ -146,7 +149,7 @@ final class GameToolbar {
     separator.widthAnchor.constraint(equalToConstant: 1).isActive = true
     separator.heightAnchor.constraint(equalToConstant: 22).isActive = true
     let toolStack = UIStackView(arrangedSubviews: [
-      build, furnish, edit, hire, separator, hospitalButton, speedButton, menu,
+      build, furnish, edit, hire, pickUp, separator, hospitalButton, speedButton, menu,
     ])
     toolStack.axis = .horizontal
     toolStack.alignment = .center

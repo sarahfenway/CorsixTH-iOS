@@ -87,6 +87,7 @@ finger moves, rather than jumping to where you touch:
 | Touch | Does |
 |---|---|
 | Slide one finger | Moves the cursor. Faster flicks move it further. |
+| Slide the cursor into an edge and keep your finger there | Scrolls the map that way, faster the longer you hold |
 | Tap | Left click where the cursor is |
 | Tap on a game dialog (fax, information box) | Presses what's under your finger; the cursor carries on from there |
 | Tap, then touch again and move | Left-button drag, for sizing rooms, scroll bars and moving windows |
@@ -120,6 +121,10 @@ any fax messages under them. The toolbar at the top right has:
 - **Hire Staff:** a panel lists who's looking for work, with their faces, qualifications, skill
   and wages. The person you hire starts at a free reception desk (receptionists) or in the
   corridor, and the game sends them where they're needed.
+- **Pick Up** (pinching hand): everyone on screen gets a tag above their head that follows them, even
+  behind walls. Tap a tag to pick that person up (to get a doctor off a break, say), drag or tap
+  to move them, then **Drop**, which lights up where they can go. ✕ puts them back. Someone
+  picked up with a two-finger tap gets the same Drop bar.
 - **Hospital** (building icon): the staff, town map, research, casebook, graphs, bank and other
   screens.
 - **Speed** (play button), and **•••** for the game menu (save, load, settings, restart, quit),

@@ -1,0 +1,56 @@
+# Picking people up by touch: Pick Up mode tags everyone on screen (the tags
+# follow them); tapping a tag picks that person up, as a right click does;
+# they're then moved like a placed item and Drop puts them down where the
+# game allows. Someone picked up another way (a two-finger tap is a right
+# click) gets the same Drop bar, and Cancel puts them back.
+wait_until 30000 TheApp.ui ~= nil
+lua TheApp:loadLevel(1, "easy")
+wait_until 30000 TheApp.world ~= nil
+wait 1000
+lua TheApp.ui:getWindow(UIInformation):close()
+native_tap Hire Staff
+wait_until 3000 require("sdl").native.screen() == "hire_staff"
+lua local d = TheApp.world.available_staff.Doctor[1]; rawset(_G, "auto_name", corsixth.require("ios.json").text(d:getFullName())); return auto_name
+lua require("sdl").native.post("hire", '{"category":"Doctor","index":1,"name":"' .. rawget(_G, "auto_name") .. '"}')
+wait_until 3000 #TheApp.ui.hospital.staff == 1
+lua TheApp.native:close()
+wait 2000
+lua rawset(_G, "auto_doc", TheApp.ui.hospital.staff[1]); return auto_doc.tile_x .. "," .. auto_doc.tile_y
+# Pick Up mode: the doctor has a tag.
+native_tap Pick Up
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer == nil
+lua local n = 0; for _, t in ipairs(TheApp.native.editor:tags()) do if t.label == rawget(_G, "auto_name") then n = n + 1 end end; rawset(_G, "auto_tagged", n); return n
+expect rawget(_G, "auto_tagged") == 1
+wait 500
+screenshot 1_tags
+# Tap the tag: picked up.
+expect require("sdl").native.tap(rawget(_G, "auto_name"))
+wait_until 3000 TheApp.ui:getWindow(UIPlaceStaff) ~= nil and TheApp.native.editor.placer ~= nil
+expect rawget(_G, "auto_doc").pickup
+# Move them to a corridor tile a few tiles away (a tap moves them), then Drop.
+lua local p = TheApp.ui:getWindow(UIPlaceStaff); local d = rawget(_G, "auto_doc"); local ox, oy = p.tile_x, p.tile_y; local spot; for r = 3, 8 do for _, o in ipairs({{r, 0}, {-r, 0}, {0, r}, {0, -r}}) do if not spot then p.tile_x, p.tile_y = d.tile_x + o[1], d.tile_y + o[2]; if p:_isValidStaffPlacement() then spot = {p.tile_x, p.tile_y} end end end end; p.tile_x, p.tile_y = ox, oy; rawset(_G, "auto_spot", spot); return spot and (spot[1] .. "," .. spot[2]) or "none"
+expect rawget(_G, "auto_spot") ~= nil
+tap_at (function() local s, ui = rawget(_G, "auto_spot"), TheApp.ui; local x, y = ui:WorldToScreen(s[1] + 0.5, s[2] + 0.5); return {x, y - 14 * ui.zoom_factor} end)()
+wait 500
+lua local p = TheApp.ui:getWindow(UIPlaceStaff); return p.tile_x .. "," .. p.tile_y
+expect TheApp.ui:getWindow(UIPlaceStaff).tile_x == rawget(_G, "auto_spot")[1] and TheApp.ui:getWindow(UIPlaceStaff).tile_y == rawget(_G, "auto_spot")[2]
+screenshot 2_carrying
+# (They walk off straight away, so note where the game sets them down.)
+lua local d = rawget(_G, "auto_doc"); local set = d.setTile; d.setTile = function(self, x, y) if not rawget(_G, "auto_set") then rawset(_G, "auto_set", {x, y}) end; return set(self, x, y) end
+native_tap Drop
+wait_until 3000 TheApp.ui:getWindow(UIPlaceStaff) == nil
+lua rawget(_G, "auto_doc").setTile = nil; local t = rawget(_G, "auto_set"); return t and (t[1] .. "," .. t[2]) or "not set"
+expect not rawget(_G, "auto_doc").pickup
+expect rawget(_G, "auto_set")[1] == rawget(_G, "auto_spot")[1] and rawget(_G, "auto_set")[2] == rawget(_G, "auto_spot")[2]
+# Still in Pick Up mode; Done ends it.
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer == nil
+native_tap Done
+wait_until 3000 TheApp.native.editor == nil
+# Picked up another way (a right click): the same Drop bar; Cancel puts them back.
+lua rawget(_G, "auto_doc"):onClick(TheApp.ui, "right")
+wait_until 3000 TheApp.native.editor ~= nil and TheApp.native.editor.placer ~= nil
+native_tap Cancel
+wait_until 3000 TheApp.ui:getWindow(UIPlaceStaff) == nil and TheApp.native.editor == nil
+expect not rawget(_G, "auto_doc").pickup
+wait 500
+screenshot 3_put_back
